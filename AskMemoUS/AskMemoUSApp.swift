@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import FirebaseCore
 import FirebaseAppCheck
 
@@ -24,7 +25,8 @@ struct AskMemoUSApp: App {
 
   var body: some Scene {
     WindowGroup {
-      SpikeView()
+      RootView()
     }
+    .modelContainer(for: [Child.self, JournalNote.self, SavedQuestion.self])
   }
 }

@@ -48,7 +48,8 @@ public enum AskCheck {
   /// Words that tie something done or left out to how the day went
   /// ("slept to 6:40 on the day we skipped the snack", "settled faster with the room dark").
   static let linkWords: Set<String> = ["when", "after", "with", "without", "because", "since", "once",
-                                       "skipped", "skip", "until", "before", "if"]
+                                       "skipped", "skip", "skipping", "missed", "stopped", "dropped", "forgot",
+                                       "until", "before", "if"]
 
   /// A note can only support a tip if it says how the day went AND links that to
   /// something done or left out. "Up at 5:10 again, happy and chatty" says neither,

@@ -158,7 +158,7 @@ public struct AskAnswer: Sendable, Hashable, Codable {
   }
 }
 
-/// One saved question for the "Your questions" timeline.
+/// One saved question for the "Your questions" timeline. Kept on the phone only.
 public struct AskRecord: Sendable, Hashable, Codable, Identifiable {
   public let id: UUID
   public let askedAt: Date
@@ -166,17 +166,13 @@ public struct AskRecord: Sendable, Hashable, Codable, Identifiable {
   public let childName: String
   public let childAgeMonths: Int?
   public let answer: AskAnswer
-  public var triedIt: Bool
-  public var helped: Bool?
 
   public init(
     id: UUID = UUID(),
     askedAt: Date,
     question: String,
     child: AskChild,
-    answer: AskAnswer,
-    triedIt: Bool = false,
-    helped: Bool? = nil
+    answer: AskAnswer
   ) {
     self.id = id
     self.askedAt = askedAt
@@ -184,7 +180,5 @@ public struct AskRecord: Sendable, Hashable, Codable, Identifiable {
     self.childName = child.name
     self.childAgeMonths = child.ageMonths
     self.answer = answer
-    self.triedIt = triedIt
-    self.helped = helped
   }
 }

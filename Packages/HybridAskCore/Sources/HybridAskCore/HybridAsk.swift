@@ -97,7 +97,7 @@ public struct HybridAsk: Sendable {
       }
     }
     let d = result.draft
-    let drafted = "\(route.rawValue) drafted: \(d.noteId) · “\(d.object)” · \(d.dayWas.rawValue)"
+    let drafted = "\(route.rawValue) drafted: \(d.noteId) · “\(d.object)”"
     return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: drafted)
   }
 }

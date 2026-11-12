@@ -385,3 +385,45 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   #expect(AnswerSource.from(modelVersion: nil) == .cloud)
   #expect(AnswerSource.from(modelVersion: "") == .cloud)
 }
+
+// MARK: - The app's sample journal (same fictional notes as SampleJournal in the app)
+
+private final class FixedDraft: AskModel, @unchecked Sendable {
+  let d: AskDraft
+  init(_ d: AskDraft) { self.d = d }
+  func draft(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    (d, .onDevice, AnswerSource.onDeviceModelVersion)
+  }
+}
+
+@Test func sampleJournalGivesSensibleTips() async throws {
+  let mia = AskChild(name: "Mia", ageMonths: 14)
+  let now = Date()
+  let texts = [
+    "Up at 5:10 again, happy and chatty in the cot.",
+    "Long nap 12–2:30 after the park.",
+    "Slept to 6:40 on the day we skipped the late snack.",
+    "Settled in ten minutes with the room dark and the white noise on.",
+    "Fussier all evening on the day she missed the afternoon nap.",
+    "Finished all her lunch when she sat at the table with us.",
+    "Pointed at the dog and said “da” three times.",
+  ]
+  let notes = texts.enumerated().map { i, t in AskNote(text: t, createdAt: now.addingTimeInterval(-Double(i + 1) * 86_400)) }
+  #expect(texts.filter(AskCheck.canSupportATip).count == 4)
+
+  func ask(_ q: String, pick text: String, object: String) async -> AskOutcome {
+    let numbered = AskPrompt.number(AskRetrieval.select(notes.filter { AskCheck.canSupportATip($0.text) }, question: q),
+                                    now: now, childName: "Mia")
+    let id = try! #require(numbered.ids.first { $0.value.text == text }?.key)
+    return await HybridAsk(model: FixedDraft(AskDraft(noteId: id, object: object, dayWas: .unclear)))
+      .answer(question: q, child: mia, notes: notes, route: .onDeviceOnly, now: now).outcome
+  }
+
+  let nap = await ask("Evenings are hard lately. Any ideas?", pick: texts[4], object: "missed the afternoon nap")
+  #expect(nap == .tip(text: "Try keeping the afternoon nap this week. Your note shows the day without it was harder.", basedOn: notes[4]))
+  let dark = await ask("How can I get her to settle at bedtime?", pick: texts[3], object: "the room dark and the white noise on")
+  if case let .tip(text, _) = dark { #expect(text.hasPrefix("Try the room dark and the white noise on again")) } else { Issue.record("\(dark)") }
+  let lunch = await ask("How can I get her to eat lunch?", pick: texts[5], object: "sat at the table with us")
+  if case let .tip(text, _) = lunch { #expect(text.contains("sat at the table with us")) } else { Issue.record("\(lunch)") }
+}
