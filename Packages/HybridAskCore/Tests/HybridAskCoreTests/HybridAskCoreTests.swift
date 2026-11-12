@@ -1,0 +1,170 @@
+import Foundation
+import Testing
+@testable import HybridAskCore
+
+private let now = Date(timeIntervalSince1970: 1_800_000_000)
+private func daysAgo(_ d: Int) -> Date { now.addingTimeInterval(-Double(d) * 86_400) }
+
+private let mia = AskChild(name: "Mia", ageMonths: 14)
+private let notes = [
+  AskNote(text: "Up at 5:10 again, happy and chatty in the cot.", category: "sleep", createdAt: daysAgo(2)),
+  AskNote(text: "Long nap 12–2:30 after the park.", category: "routine", createdAt: daysAgo(4)),
+  AskNote(text: "Slept to 6:40 on the day we skipped the late snack.", category: "sleep", createdAt: daysAgo(6)),
+]
+
+/// Returns a fixed draft and records what it was asked.
+private final class FakeModel: AskModel, @unchecked Sendable {
+  var draft: AskDraft
+  var shouldThrow = false
+  var calls = 0
+  var lastPrompt = ""
+  var lastInstructions = ""
+
+  init(_ draft: AskDraft) { self.draft = draft }
+
+  func draft(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    calls += 1
+    lastPrompt = prompt
+    lastInstructions = instructions
+    if shouldThrow { throw URLError(.notConnectedToInternet) }
+    return (draft, .onDevice, "test-model")
+  }
+}
+
+// MARK: - Age bands
+
+@Test func bandsMatchMemoUSCutPoints() {
+  #expect(AgeBand(ageMonths: 0) == .infant)
+  #expect(AgeBand(ageMonths: 11) == .infant)
+  #expect(AgeBand(ageMonths: 12) == .toddler)
+  #expect(AgeBand(ageMonths: 35) == .toddler)
+  #expect(AgeBand(ageMonths: 36) == .earlySchool)
+  #expect(AgeBand(ageMonths: 84) == .schoolAge)
+  #expect(AgeBand(ageMonths: -1) == nil)
+}
+
+// MARK: - Prompt
+
+@Test func notesAreNumberedNewestFirst() {
+  let n = AskPrompt.number(notes.reversed(), now: now)
+  #expect(n.ids["n1"]?.text.hasPrefix("Up at 5:10") == true)
+  #expect(n.ids["n3"]?.text.hasPrefix("Slept to 6:40") == true)
+  #expect(n.lines[0].hasPrefix("n1 [2d ago · sleep]"))
+}
+
+@Test func noteLimitAndEmptyNotesSkipped() {
+  var many = (0..<10).map { AskNote(text: "note \($0)", createdAt: daysAgo($0)) }
+  many.append(AskNote(text: "   ", createdAt: now))
+  let n = AskPrompt.number(many, now: now)
+  #expect(n.ids.count == AskPrompt.noteLimit)
+  #expect(n.ids["n1"]?.text == "note 0")
+}
+
+@Test func noBirthdateNeverGuessesAStage() {
+  let text = AskPrompt.instructions(for: AskChild(name: "Mia", ageMonths: nil))
+  #expect(text.contains("No birthdate is known"))
+  #expect(!text.contains("toddler"))
+}
+
+@Test func instructionsCarryTheHonestyRules() {
+  let text = AskPrompt.instructions(for: mia)
+  #expect(text.contains("never to the child"))
+  #expect(text.contains("noteId to none"))
+  #expect(text.contains("No second tip"))
+  #expect(text.contains("toddler"))
+}
+
+// MARK: - Checks
+
+@Test func tipKeepsTheRealNote() {
+  let numbered = AskPrompt.number(notes, now: now)
+  let out = AskCheck.review(
+    AskDraft(noteId: "n3", tip: "Try skipping the late snack again this week."),
+    notes: numbered.ids, child: mia
+  )
+  guard case let .tip(text, note) = out else { Issue.record("expected tip"); return }
+  #expect(text == "Try skipping the late snack again this week.")
+  #expect(note.text.hasPrefix("Slept to 6:40"))
+}
+
+@Test func unknownOrNoneNoteIsAFloor() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  #expect(AskCheck.review(AskDraft(noteId: "n9", tip: "Try x."), notes: ids, child: mia) == .floor(.noSupportingNote))
+  #expect(AskCheck.review(AskDraft(noteId: "none", tip: ""), notes: ids, child: mia) == .floor(.noSupportingNote))
+  #expect(AskCheck.review(AskDraft(noteId: " N2 ", tip: "Try a park morning."), notes: ids, child: mia)
+    != .floor(.noSupportingNote))
+}
+
+@Test func greetingToTheChildIsDropped() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  let out = AskCheck.review(
+    AskDraft(noteId: "n3", tip: "Hello, Mia. Try skipping the late snack."), notes: ids, child: mia
+  )
+  #expect(out == .tip(text: "Try skipping the late snack.", basedOn: ids["n3"]!))
+}
+
+@Test func listsAndExtraTipsAreCut() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  let draft = AskDraft(noteId: "n3", tip: """
+  Skip the late snack again. Keep bedtime the same.
+  - Practice toddler bowling.
+  - Build a cushion obstacle course.
+  """)
+  guard case let .tip(text, _) = AskCheck.review(draft, notes: ids, child: mia) else {
+    Issue.record("expected tip"); return
+  }
+  #expect(text == "Skip the late snack again. Keep bedtime the same.")
+}
+
+@Test func medicalWordsBecomeTheFixedReply() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  let out = AskCheck.review(AskDraft(noteId: "n1", tip: "Ask about melatonin."), notes: ids, child: mia)
+  #expect(out == .floor(.medicalTopic))
+  #expect(AskCheck.mentionsMedical("Is she delayed?"))
+  #expect(!AskCheck.mentionsMedical("Could I delay the snack?"))
+}
+
+// MARK: - Flow
+
+@Test func emptyNotesNeverCallTheModel() async {
+  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  let answer = await HybridAsk(model: model).answer(question: "What now?", child: mia, notes: [], now: now)
+  #expect(answer.outcome == .floor(.noNotes))
+  #expect(answer.source == .app)
+  #expect(model.calls == 0)
+}
+
+@Test func medicalQuestionNeverCallsTheModel() async {
+  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  let answer = await HybridAsk(model: model).answer(
+    question: "Does she have ADHD?", child: mia, notes: notes, now: now
+  )
+  #expect(answer.outcome == .floor(.medicalTopic))
+  #expect(model.calls == 0)
+}
+
+@Test func modelErrorIsAnHonestFloor() async {
+  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  model.shouldThrow = true
+  let answer = await HybridAsk(model: model).answer(question: "5am?", child: mia, notes: notes, now: now)
+  #expect(answer.outcome == .floor(.modelUnavailable))
+}
+
+@Test func happyPathSendsNumberedNotes() async {
+  let model = FakeModel(AskDraft(noteId: "n3", tip: "Skip the late snack again."))
+  let answer = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am. What could I try?", child: mia, notes: notes, now: now
+  )
+  #expect(model.lastPrompt.contains("n3 [6d ago · sleep] Slept to 6:40"))
+  #expect(answer.source == .onDevice)
+  guard case let .tip(_, note) = answer.outcome else { Issue.record("expected tip"); return }
+  #expect(note.text.hasPrefix("Slept to 6:40"))
+}
+
+@Test func recordRoundTripsAsJSON() throws {
+  let answer = AskAnswer(outcome: .tip(text: "Skip it.", basedOn: notes[2]), source: .cloud, modelVersion: "m")
+  let record = AskRecord(askedAt: now, question: "5am?", child: mia, answer: answer)
+  let data = try JSONEncoder().encode(record)
+  #expect(try JSONDecoder().decode(AskRecord.self, from: data) == record)
+}

@@ -1,0 +1,72 @@
+import Foundation
+import FirebaseAILogic
+import FoundationModels
+import HybridAskCore
+
+/// The structured answer both models must return. Asking for an id (not free
+/// text about the notes) is what lets the app check the answer.
+@Generable
+struct TipDraft {
+  @Guide(description: "The id of the one note this tip is based on, such as n2. Write none if no note supports a tip.")
+  var noteId: String
+
+  @Guide(description: "One small thing the parent can try soon, in one or two short sentences, speaking to the parent. Empty if noteId is none.")
+  var tip: String
+}
+
+/// `AskModel` backed by Firebase AI Logic hybrid inference.
+public struct FirebaseAskModel: AskModel {
+  /// A "billing not required" model on the Firebase AI Logic models list.
+  public static let defaultCloudModel = "gemini-3.5-flash-lite"
+
+  /// What Apple's on-device model reports as its version.
+  static let onDeviceModelVersion = "apple-foundation-models-system-language-model"
+
+  let cloudModelName: String
+
+  public init(cloudModelName: String = FirebaseAskModel.defaultCloudModel) {
+    self.cloudModelName = cloudModelName
+  }
+
+  public func draft(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    let ai = FirebaseAI.firebaseAI(backend: .googleAI())
+    let cloud = ai.geminiModel(name: cloudModelName)
+    let system = FirebaseAI.SystemLanguageModel.default
+    // A new session per question: no chat history carries over between asks.
+    let session = switch route {
+    case .hybrid:
+      ai.generativeModelSession(model: .hybridModel(primary: system, secondary: cloud), instructions: instructions)
+    case .cloudOnly:
+      ai.generativeModelSession(model: cloud, instructions: instructions)
+    case .onDeviceOnly:
+      ai.generativeModelSession(model: system, instructions: instructions)
+    }
+    let response = try await session.respond(to: prompt, generating: TipDraft.self)
+    let version = response.rawResponse.modelVersion ?? ""
+    return (
+      AskDraft(noteId: response.content.noteId, tip: response.content.tip),
+      version == Self.onDeviceModelVersion ? .onDevice : .cloud,
+      version
+    )
+  }
+}
+
+/// On-device availability, for the status line and the "turn on Apple Intelligence" hint.
+public enum OnDeviceStatus: Sendable, Equatable {
+  case available
+  case deviceNotEligible
+  case appleIntelligenceOff
+  case modelDownloading
+  case unavailable
+
+  public static var current: OnDeviceStatus {
+    switch FirebaseAI.SystemLanguageModel.default.availability {
+    case .available: .available
+    case .unavailable(.deviceNotEligible): .deviceNotEligible
+    case .unavailable(.appleIntelligenceNotEnabled): .appleIntelligenceOff
+    case .unavailable(.modelNotReady): .modelDownloading
+    case .unavailable: .unavailable
+    }
+  }
+}

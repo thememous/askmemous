@@ -5,6 +5,10 @@ options:
     iOS: "26.0"
   createIntermediateGroups: true
 packages:
+  HybridAskCore:
+    path: Packages/HybridAskCore
+  HybridAskFirebase:
+    path: Packages/HybridAskFirebase
   Firebase:
     url: https://github.com/firebase/firebase-ios-sdk
     from: 12.13.0
@@ -37,7 +41,7 @@ targets:
     dependencies:
       - package: Firebase
         product: FirebaseCore
-      - package: Firebase
-        product: FirebaseAILogic
+      - package: HybridAskCore
+      - package: HybridAskFirebase
       - package: Firebase
         product: FirebaseAppCheck
