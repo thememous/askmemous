@@ -32,6 +32,7 @@ public enum AskCheck {
       guard quoteIsInNote(quote, note: note) else { return .floor(.noSupportingNote) }
       guard keepsDirection(quote: quote, tip: tip) else { return .floor(.noSupportingNote) }
     }
+    guard !isEcho(tip: tip, note: note) else { return .floor(.noSupportingNote) }
     return .tip(text: tip, basedOn: note)
   }
 
@@ -120,5 +121,27 @@ public enum AskCheck {
       .map { $0.isLetter || $0.isNumber ? $0 : " " }
       .reduce(into: "") { $0.append($1) }
       .split(separator: " ").joined(separator: " ")
+  }
+
+  // MARK: - Echo
+
+  /// A tip that just repeats the note ("Take a long nap 12–2:30 after the park")
+  /// is not advice. Rejected when the tip contains a 4+ word run of the note,
+  /// or when nearly all of its words come straight from the note.
+  public static func isEcho(tip: String, note: AskNote) -> Bool {
+    let t = normalized(tip).split(separator: " ").map(String.init)
+    let n = normalized(note.text).split(separator: " ").map(String.init)
+    guard t.count >= 3, n.count >= 4 else { return false }
+    let tipText = " " + t.joined(separator: " ") + " "
+    for i in 0...(n.count - 4) where tipText.contains(" " + n[i..<i + 4].joined(separator: " ") + " ") {
+      return true
+    }
+    let fillers: Set<String> = ["a", "an", "the", "to", "try", "again", "soon", "this", "week", "tonight",
+                                "today", "her", "his", "their", "it", "and", "on", "at", "of"]
+    let content = t.filter { !fillers.contains($0) }
+    guard content.count >= 3 else { return false }
+    let noteWords = Set(n)
+    let copied = content.filter { noteWords.contains($0) }.count
+    return Double(copied) / Double(content.count) >= 0.85
   }
 }

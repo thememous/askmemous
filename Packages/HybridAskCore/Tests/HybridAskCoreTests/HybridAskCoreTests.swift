@@ -264,3 +264,15 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   #expect(answer.escalated)
   #expect(answer.outcome == .tip(text: "Try skipping the late snack this week.", basedOn: notes[2]))
 }
+
+// MARK: - Echo
+
+@Test func tipThatRepeatsTheNoteIsRejected() {
+  #expect(AskCheck.isEcho(tip: "Take a long nap 12–2:30 after the park soon.", note: notes[1]))
+  #expect(!AskCheck.isEcho(tip: "Leave the late snack out again tonight.", note: notes[2]))
+  #expect(!AskCheck.isEcho(tip: "Try skipping the late snack this week.", note: notes[2]))
+  #expect(!AskCheck.isEcho(tip: "Move the snack earlier, before bath.", note: notes[2]))
+  let ids = AskPrompt.number(notes, now: now).ids
+  let echo = AskDraft(noteId: "n2", quote: "Long nap 12–2:30 after the park", tip: "Take a long nap 12–2:30 after the park soon.")
+  #expect(AskCheck.review(echo, notes: ids, child: mia) == .floor(.noSupportingNote))
+}
