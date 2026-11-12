@@ -7,7 +7,7 @@ public enum AskPrompt {
   static let noteMaxChars = 240
   static let questionMaxChars = 400
 
-  /// Short ids in the order the notes are listed (newest first).
+  /// Short ids in the order the notes were given (best match first, from `AskRetrieval`).
   public struct Numbered: Sendable {
     public let ids: [String: AskNote]
     public let lines: [String]
@@ -16,7 +16,6 @@ public enum AskPrompt {
   public static func number(_ notes: [AskNote], now: Date) -> Numbered {
     let recent = notes
       .filter { !clip($0.text, noteMaxChars).isEmpty }
-      .sorted { $0.createdAt > $1.createdAt }
       .prefix(noteLimit)
     var ids: [String: AskNote] = [:]
     var lines: [String] = []
@@ -33,21 +32,17 @@ public enum AskPrompt {
   }
 
   public static func instructions(for child: AskChild) -> String {
-    var rules = [
-      "You help a parent decide one small thing to try with their child.",
-      "Speak to the parent, never to the child. Do not greet anyone.",
+    // Age shapes nothing here: the model picks words, it doesn't write advice.
+    let rules = [
+      "You help a parent find one thing in their own notes worth trying again.",
+      "You do not write advice. The app writes the tip from what you pick.",
       "Choose the ONE note that speaks most directly to the question (same topic first) and give its id in noteId.",
-      "If no note is about the same thing as the question, set noteId to none and leave tip empty.",
-      "For 'what could I try' questions, prefer a note that shows what was different on a better day, and build the tip on that difference.",
-      "The tip is one or two short sentences: one thing they can try soon. No lists. No second tip.",
-      "Only use what the notes say. Do not invent events, interests, milestones, or delays.",
-      "Do not diagnose, name conditions, or suggest medicine.",
+      "Prefer a note that compares days or says how a day went after something was done or left out.",
+      "In object, copy 2 to 10 words from that note, word for word, naming the thing that was done or left out that day. Do not include words like skipped, without or no; the app reads those from the note.",
+      "In dayWas, say whether that day went better or worse, going only by the note's own words. Use unclear if the note doesn't say.",
+      "If no note is about the same thing as the question, set noteId to none, object empty, dayWas unclear.",
+      "Never invent anything that is not in the notes.",
     ]
-    if let band = child.band {
-      rules.append(guidance(band))
-    } else {
-      rules.append("No birthdate is known. Do not guess an age or give age-specific activities.")
-    }
     return rules.joined(separator: "\n")
   }
 
@@ -55,7 +50,7 @@ public enum AskPrompt {
     let header = child.ageMonths.map { "\(child.name), \($0) months old" } ?? child.name
     return """
     Child: \(header)
-    Notes (newest first):
+    Notes (most relevant first):
     \(numbered.lines.joined(separator: "\n"))
 
     Parent's question: \(clip(question, questionMaxChars))

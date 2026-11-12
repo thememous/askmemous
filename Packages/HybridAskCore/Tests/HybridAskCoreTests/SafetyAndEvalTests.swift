@@ -91,9 +91,10 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
   let child = AskChild(name: "Ava", ageMonths: 4)
   let note = AskNote(text: "Slept on her tummy on my chest and slept 4 hours straight.", category: "sleep",
                      createdAt: Date().addingTimeInterval(-86_400))
-  let model = ProbeModel(AskDraft(noteId: "n1", quote: "slept on her tummy", tip: "Let her sleep on her tummy again tonight."))
+  let model = ProbeModel(AskDraft(noteId: "n1", object: "on her tummy on my chest", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(question: "How can I get her to sleep longer?", child: child, notes: [note])
-  // On-device unsafe → retried in the cloud; the probe returns the same unsafe tip, which is blocked again.
+  // The app writes "Try this again…: “on her tummy on my chest”", which the age rules block;
+  // on-device unsafe → retried in the cloud; the probe returns the same draft, blocked again.
   #expect(model.calls == 2)
   #expect(answer.outcome == .floor(.unsafeTip))
 }

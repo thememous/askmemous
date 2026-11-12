@@ -53,80 +53,130 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 
 // MARK: - Prompt
 
-@Test func notesAreNumberedNewestFirst() {
-  let n = AskPrompt.number(notes.reversed(), now: now)
+@Test func notesKeepTheGivenOrder() {
+  let n = AskPrompt.number(notes, now: now)
   #expect(n.ids["n1"]?.text.hasPrefix("Up at 5:10") == true)
   #expect(n.ids["n3"]?.text.hasPrefix("Slept to 6:40") == true)
   #expect(n.lines[0].hasPrefix("n1 [2d ago · sleep]"))
+  let reversed = AskPrompt.number(notes.reversed(), now: now)
+  #expect(reversed.ids["n1"]?.text.hasPrefix("Slept to 6:40") == true)
 }
 
 @Test func noteLimitAndEmptyNotesSkipped() {
   var many = (0..<10).map { AskNote(text: "note \($0)", createdAt: daysAgo($0)) }
-  many.append(AskNote(text: "   ", createdAt: now))
+  many.insert(AskNote(text: "   ", createdAt: now), at: 0)
   let n = AskPrompt.number(many, now: now)
   #expect(n.ids.count == AskPrompt.noteLimit)
   #expect(n.ids["n1"]?.text == "note 0")
 }
 
-@Test func noBirthdateNeverGuessesAStage() {
-  let text = AskPrompt.instructions(for: AskChild(name: "Mia", ageMonths: nil))
-  #expect(text.contains("No birthdate is known"))
-  #expect(!text.contains("toddler"))
-}
-
-@Test func instructionsCarryTheHonestyRules() {
+@Test func instructionsAskOnlyForWordsAndDirection() {
   let text = AskPrompt.instructions(for: mia)
-  #expect(text.contains("never to the child"))
   #expect(text.contains("noteId to none"))
-  #expect(text.contains("No second tip"))
-  #expect(text.contains("toddler"))
+  #expect(text.contains("word for word"))
+  #expect(text.contains("dayWas"))
+  #expect(text.contains("The app writes the tip"))
 }
 
-// MARK: - Checks
+// MARK: - Retrieval
 
-@Test func tipKeepsTheRealNote() {
-  let numbered = AskPrompt.number(notes, now: now)
-  let out = AskCheck.review(
-    AskDraft(noteId: "n3", tip: "Try skipping the late snack again this week."),
-    notes: numbered.ids, child: mia
-  )
-  guard case let .tip(text, note) = out else { Issue.record("expected tip"); return }
-  #expect(text == "Try skipping the late snack again this week.")
-  #expect(note.text.hasPrefix("Slept to 6:40"))
+@Test func retrievalFindsTheOlderSleepNote() throws {
+  let c = try #require(try EvalSet.bundled().cases.first { $0.id == "h20-retrieval-older-sleep-note" })
+  let built = c.askNotes(now: now)
+  let picked = AskRetrieval.select(built.notes, question: c.question)
+  #expect(picked.count == AskRetrieval.defaultLimit)
+  #expect(picked.contains { built.caseIdFor[$0.id] == "g" })
+}
+
+@Test func fewNotesAreAllKept() {
+  #expect(AskRetrieval.select(notes, question: "Anything?").count == 3)
+}
+
+// MARK: - Finding the object
+
+@Test func objectMustBeTheNotesOwnWords() {
+  let text = notes[2].text
+  #expect(AskCheck.locate("the late snack", in: text)?.span == "the late snack")
+  #expect(AskCheck.locate("the late snack", in: text)?.leftOut == true)
+  #expect(AskCheck.locate("skipped the LATE snack.", in: text)?.leftOut == true)
+  #expect(AskCheck.locate("the day we skipped the late snack", in: text)?.span == "the late snack")
+  #expect(AskCheck.locate("gave her a late snack", in: text) == nil)
+  #expect(AskCheck.locate("snack", in: text) == nil)
+  #expect(AskCheck.locate("loves exploring the garden", in: notes[1].text) == nil)
+}
+
+@Test func smallSlipsInCopyingStillMatch() {
+  let note = "Went down at 7 without crying when we kept the room dark and quiet after dinner."
+  let found = AskCheck.locate("kept the room dark and quiet after dinner", in: note)
+  #expect(found?.span == "kept the room dark and quiet after dinner")
+  #expect(found?.leftOut == false)
+  // One word off out of eight still counts; the span is the note's own text.
+  #expect(AskCheck.locate("kept the room dark and calm after dinner", in: note) != nil)
+}
+
+@Test func dayIsReadFromTheNotesWording() {
+  #expect(AskCheck.dayFromWording(notes[2].text) == .better)
+  #expect(AskCheck.dayFromWording("Fussy all afternoon on the day we skipped the morning nap.") == .worse)
+  #expect(AskCheck.dayFromWording("Went down at 7 without crying when we kept the room dark.") == .better)
+  #expect(AskCheck.dayFromWording("Long nap 12–2:30 after the park.") == .unclear)
+  #expect(AskCheck.dayFromWording("Cried at drop-off but settled quickly.") == .unclear)
+}
+
+// MARK: - The app decides the direction
+
+@Test func betterDayWithoutItMeansLeaveItOut() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better), notes: ids, child: mia) == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: ids["n3"]!))
+}
+
+@Test func betterDayWithItMeansRepeatIt() {
+  let note = AskNote(text: "Didn't cry at drop-off when we did a quick goodbye wave at the door.", createdAt: daysAgo(1))
+  let out = AskCheck.review(AskDraft(noteId: "n1", object: "a quick goodbye wave at the door", dayWas: .better),
+                            notes: ["n1": note], child: mia)
+  #expect(out == .tip(text: "Try a quick goodbye wave at the door again this week. It's what was different on the better day in your note.", basedOn: note))
+}
+
+@Test func worseDayWithoutItMeansKeepIt() {
+  let note = AskNote(text: "Fussy all afternoon on the day we skipped the morning nap.", createdAt: daysAgo(1))
+  let out = AskCheck.review(AskDraft(noteId: "n1", object: "the morning nap", dayWas: .worse),
+                            notes: ["n1": note], child: mia)
+  #expect(out == .tip(text: "Try keeping the morning nap this week. Your note shows the day without it was harder.", basedOn: note))
+}
+
+@Test func worseDayWithItHasNothingToRepeat() {
+  let note = AskNote(text: "Cried for an hour after the late screen time.", createdAt: daysAgo(1))
+  let out = AskCheck.review(AskDraft(noteId: "n1", object: "the late screen time", dayWas: .worse),
+                            notes: ["n1": note], child: mia)
+  #expect(out == .floor(.noSupportingNote))
+}
+
+@Test func modelAndNoteMustAgreeOnTheDay() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  // The note says better; a model claiming worse would flip the advice.
+  #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse), notes: ids, child: mia)
+    == .floor(.noSupportingNote))
+  // Note silent, model unsure: nothing to go on.
+  #expect(AskCheck.review(AskDraft(noteId: "n2", object: "after the park", dayWas: .unclear), notes: ids, child: mia)
+    == .floor(.noSupportingNote))
 }
 
 @Test func unknownOrNoneNoteIsAFloor() {
   let ids = AskPrompt.number(notes, now: now).ids
-  #expect(AskCheck.review(AskDraft(noteId: "n9", tip: "Try x."), notes: ids, child: mia) == .floor(.noSupportingNote))
-  #expect(AskCheck.review(AskDraft(noteId: "none", tip: ""), notes: ids, child: mia) == .floor(.noSupportingNote))
-  #expect(AskCheck.review(AskDraft(noteId: " N2 ", tip: "Try a park morning."), notes: ids, child: mia)
+  #expect(AskCheck.review(AskDraft(noteId: "n9", object: "the late snack", dayWas: .better), notes: ids, child: mia) == .floor(.noSupportingNote))
+  #expect(AskCheck.review(AskDraft(noteId: "none", object: "", dayWas: .unclear), notes: ids, child: mia) == .floor(.noSupportingNote))
+  #expect(AskCheck.review(AskDraft(noteId: " N3 ", object: "the late snack", dayWas: .better), notes: ids, child: mia)
     != .floor(.noSupportingNote))
 }
 
-@Test func greetingToTheChildIsDropped() {
-  let ids = AskPrompt.number(notes, now: now).ids
-  let out = AskCheck.review(
-    AskDraft(noteId: "n3", tip: "Hello, Mia. Try skipping the late snack."), notes: ids, child: mia
-  )
-  #expect(out == .tip(text: "Try skipping the late snack.", basedOn: ids["n3"]!))
-}
-
-@Test func listsAndExtraTipsAreCut() {
-  let ids = AskPrompt.number(notes, now: now).ids
-  let draft = AskDraft(noteId: "n3", tip: """
-  Skip the late snack again. Keep bedtime the same.
-  - Practice toddler bowling.
-  - Build a cushion obstacle course.
-  """)
-  guard case let .tip(text, _) = AskCheck.review(draft, notes: ids, child: mia) else {
-    Issue.record("expected tip"); return
-  }
-  #expect(text == "Skip the late snack again. Keep bedtime the same.")
+@Test func tipWithoutADeterminerIsQuoted() {
+  #expect(TipText.compose(action: .repeatIt, object: "kept the room dark")
+    == "Try this again this week: “kept the room dark”. It's what was different on the better day in your note.")
 }
 
 @Test func medicalWordsBecomeTheFixedReply() {
-  let ids = AskPrompt.number(notes, now: now).ids
-  let out = AskCheck.review(AskDraft(noteId: "n1", tip: "Ask about melatonin."), notes: ids, child: mia)
+  let note = AskNote(text: "Slept through after the melatonin gummy.", createdAt: daysAgo(1))
+  let out = AskCheck.review(AskDraft(noteId: "n1", object: "the melatonin gummy", dayWas: .better),
+                            notes: ["n1": note], child: mia)
   #expect(out == .floor(.medicalTopic))
   #expect(AskCheck.mentionsMedical("Is she delayed?"))
   #expect(!AskCheck.mentionsMedical("Could I delay the snack?"))
@@ -135,7 +185,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 // MARK: - Flow
 
 @Test func emptyNotesNeverCallTheModel() async {
-  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(question: "What now?", child: mia, notes: [], now: now)
   #expect(answer.outcome == .floor(.noNotes))
   #expect(answer.source == .app)
@@ -143,7 +193,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func medicalQuestionNeverCallsTheModel() async {
-  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
     question: "Does she have ADHD?", child: mia, notes: notes, now: now
   )
@@ -152,21 +202,20 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func modelErrorIsAnHonestFloor() async {
-  let model = FakeModel(AskDraft(noteId: "n1", tip: "x"))
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   model.shouldThrow = true
   let answer = await HybridAsk(model: model).answer(question: "5am?", child: mia, notes: notes, now: now)
   #expect(answer.outcome == .floor(.modelUnavailable))
 }
 
 @Test func happyPathSendsNumberedNotes() async {
-  let model = FakeModel(AskDraft(noteId: "n3", tip: "Skip the late snack again."))
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am. What could I try?", child: mia, notes: notes, now: now
   )
   #expect(model.lastPrompt.contains("n3 [6d ago · sleep] Slept to 6:40"))
   #expect(answer.source == .onDevice)
-  guard case let .tip(_, note) = answer.outcome else { Issue.record("expected tip"); return }
-  #expect(note.text.hasPrefix("Slept to 6:40"))
+  #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
 }
 
 @Test func recordRoundTripsAsJSON() throws {
@@ -191,8 +240,8 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func offTopicOnDeviceAnswerEscalatesToCloud() async {
-  let model = FakeModel(AskDraft(noteId: "n2", tip: "Take a walk to explore."))
-  model.cloudDraft = AskDraft(noteId: "none", tip: "")
+  let model = FakeModel(AskDraft(noteId: "n2", object: "after the park", dayWas: .better))
+  model.cloudDraft = AskDraft(noteId: "none", object: "", dayWas: .unclear)
   let answer = await HybridAsk(model: model).answer(
     question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
   )
@@ -203,7 +252,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func offlineEscalationKeepsTheHonestFloor() async {
-  let model = FakeModel(AskDraft(noteId: "n2", tip: "Take a walk to explore."))
+  let model = FakeModel(AskDraft(noteId: "n2", object: "after the park", dayWas: .better))
   model.cloudThrows = true
   let answer = await HybridAsk(model: model).answer(
     question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
@@ -214,7 +263,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func goodOnDeviceAnswerNeverCallsTheCloud() async {
-  let model = FakeModel(AskDraft(noteId: "n3", tip: "Skip the late snack again."))
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
   )
@@ -223,56 +272,19 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func onDeviceOnlyRouteNeverEscalates() async {
-  let model = FakeModel(AskDraft(noteId: "none", tip: ""))
+  let model = FakeModel(AskDraft(noteId: "none", object: "", dayWas: .unclear))
   _ = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am.", child: mia, notes: notes, route: .onDeviceOnly, now: now
   )
   #expect(model.routes == [.onDeviceOnly])
 }
 
-// MARK: - Quote + direction
-
-@Test func quoteMustBeRealWordsFromTheNote() {
-  #expect(AskCheck.quoteIsInNote("skipped the late snack", note: notes[2]))
-  #expect(AskCheck.quoteIsInNote("Skipped  the LATE snack.", note: notes[2]))
-  #expect(!AskCheck.quoteIsInNote("gave her a late snack", note: notes[2]))
-  #expect(!AskCheck.quoteIsInNote("snack", note: notes[2]))
-}
-
-@Test func reversedAdviceIsRejected() {
-  let ids = AskPrompt.number(notes, now: now).ids
-  let reversed = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Offer the late snack again soon.")
-  #expect(AskCheck.review(reversed, notes: ids, child: mia) == .floor(.noSupportingNote))
-  let kept = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Try skipping the late snack this week.")
-  #expect(AskCheck.review(kept, notes: ids, child: mia) == .tip(text: "Try skipping the late snack this week.", basedOn: ids["n3"]!))
-  let moved = AskDraft(noteId: "n3", quote: "we skipped the late snack", tip: "Move the snack earlier, before bath.")
-  #expect(AskCheck.review(moved, notes: ids, child: mia) != .floor(.noSupportingNote))
-}
-
-@Test func madeUpQuoteIsRejected() {
-  let ids = AskPrompt.number(notes, now: now).ids
-  let draft = AskDraft(noteId: "n2", quote: "loves exploring the garden", tip: "Try a garden walk.")
-  #expect(AskCheck.review(draft, notes: ids, child: mia) == .floor(.noSupportingNote))
-}
-
-@Test func reversedOnDeviceAnswerEscalates() async {
-  let model = FakeModel(AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Offer the late snack again soon."))
-  model.cloudDraft = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Try skipping the late snack this week.")
+@Test func wrongDayOnDeviceEscalatesAndCloudFixesIt() async {
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse))
+  model.cloudDraft = AskDraft(noteId: "n3", object: "the late snack", dayWas: .better)
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
   )
   #expect(answer.escalated)
-  #expect(answer.outcome == .tip(text: "Try skipping the late snack this week.", basedOn: notes[2]))
-}
-
-// MARK: - Echo
-
-@Test func tipThatRepeatsTheNoteIsRejected() {
-  #expect(AskCheck.isEcho(tip: "Take a long nap 12–2:30 after the park soon.", note: notes[1]))
-  #expect(!AskCheck.isEcho(tip: "Leave the late snack out again tonight.", note: notes[2]))
-  #expect(!AskCheck.isEcho(tip: "Try skipping the late snack this week.", note: notes[2]))
-  #expect(!AskCheck.isEcho(tip: "Move the snack earlier, before bath.", note: notes[2]))
-  let ids = AskPrompt.number(notes, now: now).ids
-  let echo = AskDraft(noteId: "n2", quote: "Long nap 12–2:30 after the park", tip: "Take a long nap 12–2:30 after the park soon.")
-  #expect(AskCheck.review(echo, notes: ids, child: mia) == .floor(.noSupportingNote))
+  #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
 }

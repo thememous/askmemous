@@ -55,19 +55,35 @@ public enum AnswerSource: String, Sendable, Codable {
   case app
 }
 
-/// What the model is asked to return: one note id (or "none") and one tip.
-public struct AskDraft: Sendable, Hashable {
-  public let noteId: String
-  /// The exact words from the note the tip builds on. When present, the app
-  /// checks they really appear in the note and that the tip keeps their direction.
-  public let quote: String?
-  public let tip: String
+/// How the day in the chosen note went.
+public enum DayWas: String, Sendable, Codable, CaseIterable {
+  case better, worse, unclear
+}
 
-  public init(noteId: String, quote: String? = nil, tip: String) {
+/// What the model is asked to return. The model only points and classifies;
+/// the app checks every field and writes the tip sentence itself.
+public struct AskDraft: Sendable, Hashable {
+  /// Short id of the chosen note (n1…), or "none".
+  public let noteId: String
+  /// The few words from that note naming what was done or left out that day.
+  public let object: String
+  public let dayWas: DayWas
+
+  public init(noteId: String, object: String, dayWas: DayWas) {
     self.noteId = noteId
-    self.quote = quote
-    self.tip = tip
+    self.object = object
+    self.dayWas = dayWas
   }
+}
+
+/// What the app suggests, worked out from the note (not chosen by the model).
+public enum TipAction: String, Sendable, Codable {
+  /// Done on a better day → do it again.
+  case repeatIt
+  /// Left out on a better day → leave it out again.
+  case leaveOut
+  /// Left out on a worse day → keep it in.
+  case keepIt
 }
 
 /// Which models a request may use. `.hybrid` is the product behaviour.

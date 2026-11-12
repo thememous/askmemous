@@ -3,8 +3,14 @@ import FirebaseAILogic
 import FoundationModels
 import HybridAskCore
 
-/// The structured answer both models must return. Asking for an id (not free
-/// text about the notes) is what lets the app check the answer.
+/// How the day in the chosen note went, by the note's own words.
+@Generable
+enum DayWasChoice {
+  case better, worse, unclear
+}
+
+/// The structured answer both models must return. The model only points and
+/// copies; the app checks every field and writes the tip itself.
 @Generable
 struct TipDraft {
   // Generated first on purpose: naming the link before choosing makes a small
@@ -15,11 +21,11 @@ struct TipDraft {
   @Guide(description: "The id of that note, such as n2. Write none if no note speaks to the question.")
   var noteId: String
 
-  @Guide(description: "Copy the exact words from that note that the tip builds on, word for word. Empty if noteId is none.")
-  var quote: String
+  @Guide(description: "2 to 10 words copied word for word from that note, naming the thing that was done or left out that day. Leave out words like skipped, without or no. Empty if noteId is none.")
+  var object: String
 
-  @Guide(description: "One small thing the parent can try soon that follows what the quoted words show (if something was left out on a better day, suggest leaving it out again), in one or two short sentences, speaking to the parent. Empty if noteId is none.")
-  var tip: String
+  @Guide(description: "Did that day go better or worse, by the note's own words? unclear if it doesn't say.")
+  var dayWas: DayWasChoice
 }
 
 /// `AskModel` backed by Firebase AI Logic hybrid inference.
@@ -53,7 +59,13 @@ public struct FirebaseAskModel: AskModel {
     let response = try await session.respond(to: prompt, generating: TipDraft.self)
     let version = response.rawResponse.modelVersion ?? ""
     return (
-      AskDraft(noteId: response.content.noteId, quote: response.content.quote, tip: response.content.tip),
+      AskDraft(noteId: response.content.noteId, object: response.content.object, dayWas: {
+        switch response.content.dayWas {
+        case .better: .better
+        case .worse: .worse
+        case .unclear: .unclear
+        }
+      }()),
       version == Self.onDeviceModelVersion ? .onDevice : .cloud,
       version
     )

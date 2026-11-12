@@ -24,7 +24,8 @@ public struct HybridAsk: Sendable {
     case nil: break
     }
 
-    let numbered = AskPrompt.number(notes, now: now)
+    let selected = AskRetrieval.select(notes, question: q, limit: AskRetrieval.defaultLimit)
+    let numbered = AskPrompt.number(selected, now: now)
     guard !numbered.ids.isEmpty else { return .app(.noNotes) }
 
     let instructions = AskPrompt.instructions(for: child)
