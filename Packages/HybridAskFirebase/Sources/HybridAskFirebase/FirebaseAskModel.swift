@@ -3,12 +3,6 @@ import FirebaseAILogic
 import FoundationModels
 import HybridAskCore
 
-/// How the day in the chosen note went, by the note's own words.
-@Generable
-enum DayWasChoice {
-  case better, worse, unclear
-}
-
 /// The structured answer both models must return. The model only points and
 /// copies; the app checks every field and writes the tip itself.
 @Generable
@@ -23,9 +17,6 @@ struct TipDraft {
 
   @Guide(description: "2 to 10 words copied word for word from that note, naming the thing that was done or left out that day. Leave out words like skipped, without or no. Empty if noteId is none.")
   var object: String
-
-  @Guide(description: "Did that day go better or worse, by the note's own words? unclear if it doesn't say.")
-  var dayWas: DayWasChoice
 }
 
 /// `AskModel` backed by Firebase AI Logic hybrid inference.
@@ -56,13 +47,8 @@ public struct FirebaseAskModel: AskModel {
     let response = try await session.respond(to: prompt, generating: TipDraft.self)
     let version = response.rawResponse.modelVersion ?? ""
     return (
-      AskDraft(noteId: response.content.noteId, object: response.content.object, dayWas: {
-        switch response.content.dayWas {
-        case .better: .better
-        case .worse: .worse
-        case .unclear: .unclear
-        }
-      }()),
+      // The app reads better/worse from the note itself; on device the model got it backwards.
+      AskDraft(noteId: response.content.noteId, object: response.content.object, dayWas: .unclear),
       AnswerSource.from(modelVersion: version),
       version
     )

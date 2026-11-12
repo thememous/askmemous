@@ -76,7 +76,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   let text = AskPrompt.instructions(for: mia)
   #expect(text.contains("noteId to none"))
   #expect(text.contains("word for word"))
-  #expect(text.contains("dayWas"))
+  #expect(!text.contains("dayWas"), "the app reads the day from the note")
   #expect(text.contains("The app writes the tip"))
 }
 
@@ -215,12 +215,27 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   #expect(answer.outcome == .floor(.modelUnavailable))
 }
 
+@Test func onlyNotesThatCanBackATipReachTheModel() async {
+  #expect(AskCheck.canSupportATip(notes[2].text))   // better day + "skipped"
+  #expect(!AskCheck.canSupportATip(notes[0].text))  // "happy and chatty", nothing linked
+  #expect(!AskCheck.canSupportATip(notes[1].text))  // doesn't say how the day went
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the late snack", dayWas: .unclear))
+  _ = await HybridAsk(model: model).answer(question: "She keeps waking at 5am.", child: mia, notes: notes, now: now)
+  #expect(!model.lastPrompt.contains("chatty"))
+  #expect(!model.lastPrompt.contains("Long nap"))
+  // No usable note: the app answers without asking any model.
+  let none = FakeModel(AskDraft(noteId: "n1", object: "x y", dayWas: .unclear))
+  let answer = await HybridAsk(model: none).answer(question: "5am?", child: mia, notes: Array(notes.prefix(2)), cloudAllowed: true, now: now)
+  #expect(answer.outcome == .floor(.noSupportingNote))
+  #expect(none.calls == 0)
+}
+
 @Test func happyPathSendsNumberedNotes() async {
-  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am. What could I try?", child: mia, notes: notes, now: now
   )
-  #expect(model.lastPrompt.contains("n3 [6d ago · sleep] Slept to 6:40"))
+  #expect(model.lastPrompt.contains("n1 [6d ago · sleep] Slept to 6:40"))
   #expect(answer.source == .onDevice)
   #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
 }
@@ -270,7 +285,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func goodOnDeviceAnswerNeverCallsTheCloud() async {
-  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
   )
@@ -287,8 +302,8 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func wrongDayOnDeviceEscalatesAndCloudFixesIt() async {
-  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse))
-  model.cloudDraft = AskDraft(noteId: "n3", object: "the late snack", dayWas: .better)
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the late snack", dayWas: .worse))
+  model.cloudDraft = AskDraft(noteId: "n1", object: "the late snack", dayWas: .better)
   let answer = await HybridAsk(model: model).answer(
     question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
   )
@@ -310,7 +325,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 }
 
 @Test func goodAnswerWithoutConsentDoesNotOfferTheCloud() async {
-  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(question: "She keeps waking at 5am.", child: mia, notes: notes, now: now)
   #expect(!answer.cloudCouldHelp)
 }

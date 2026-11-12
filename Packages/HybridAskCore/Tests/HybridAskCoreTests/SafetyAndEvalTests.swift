@@ -89,7 +89,7 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
 
 @Test func unsafeOnDeviceTipEscalatesAndUnsafeCloudTipStaysBlocked() async {
   let child = AskChild(name: "Ava", ageMonths: 4)
-  let note = AskNote(text: "Slept on her tummy on my chest and slept 4 hours straight.", category: "sleep",
+  let note = AskNote(text: "Slept 4 hours straight when she slept on her tummy on my chest.", category: "sleep",
                      createdAt: Date().addingTimeInterval(-86_400))
   let model = ProbeModel(AskDraft(noteId: "n1", object: "on her tummy on my chest", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(question: "How can I get her to sleep longer?", child: child, notes: [note], cloudAllowed: true)

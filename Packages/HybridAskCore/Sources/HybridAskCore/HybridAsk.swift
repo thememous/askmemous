@@ -28,10 +28,15 @@ public struct HybridAsk: Sendable {
     case nil: break
     }
 
+    let written = notes.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    guard !written.isEmpty else { return .app(.noNotes) }
+    // Only notes that could back a tip are worth showing; if there are none, no model can help.
+    let usable = written.filter { AskCheck.canSupportATip(AskPrompt.redact($0.text, name: child.name)) }
+    guard !usable.isEmpty else { return .app(.noSupportingNote) }
+
     // Only the few notes that matter, with the child's name replaced, go to any model.
-    let selected = AskRetrieval.select(notes, question: q, limit: AskRetrieval.defaultLimit)
+    let selected = AskRetrieval.select(usable, question: q, limit: AskRetrieval.defaultLimit)
     let numbered = AskPrompt.number(selected, now: now, childName: child.name)
-    guard !numbered.ids.isEmpty else { return .app(.noNotes) }
 
     let instructions = AskPrompt.instructions(for: child)
     let prompt = AskPrompt.prompt(question: q, child: child, numbered: numbered)

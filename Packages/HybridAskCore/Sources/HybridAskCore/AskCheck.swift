@@ -12,6 +12,7 @@ public enum AskCheck {
 
     // The model saw the note with the name replaced, so check against that same text.
     let seen = AskPrompt.redact(note.text, name: child.name)
+    guard canSupportATip(seen) else { return .floor(.noSupportingNote) }
 
     // 1. The object must be the note's own words. We show the note's text, not the model's.
     guard let found = locate(draft.object, in: seen) else { return .floor(.noSupportingNote) }
@@ -40,6 +41,20 @@ public enum AskCheck {
     case (.worse, true): .keepIt
     default: nil // a worse day where something was done: nothing in the note to repeat
     }
+  }
+
+  // MARK: - Which notes can support a tip
+
+  /// Words that tie something done or left out to how the day went
+  /// ("slept to 6:40 on the day we skipped the snack", "settled faster with the room dark").
+  static let linkWords: Set<String> = ["when", "after", "with", "without", "because", "since", "once",
+                                       "skipped", "skip", "until", "before", "if"]
+
+  /// A note can only support a tip if it says how the day went AND links that to
+  /// something done or left out. "Up at 5:10 again, happy and chatty" says neither,
+  /// so the model never sees it as a choice: fewer wrong picks, and nothing lost.
+  public static func canSupportATip(_ text: String) -> Bool {
+    dayFromWording(text) != .unclear && tokens(text).contains(where: linkWords.contains)
   }
 
   // MARK: - Finding the object in the note
