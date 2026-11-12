@@ -1,0 +1,43 @@
+name: AskMemoUS
+options:
+  bundleIdPrefix: com.memous
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 12.13.0
+targets:
+  AskMemoUS:
+    type: application
+    platform: iOS
+    sources:
+      - path: AskMemoUS
+    entitlements:
+      path: AskMemoUS/AskMemoUS.entitlements
+      properties:
+        com.apple.developer.devicecheck.appattest-environment: development
+    info:
+      path: AskMemoUS/Info.plist
+      properties:
+        CFBundleDisplayName: AskMemoUS
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memous.hybridask
+        DEVELOPMENT_TEAM: ${ASKMEMOUS_TEAM}
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseAILogic
+      - package: Firebase
+        product: FirebaseAppCheck
