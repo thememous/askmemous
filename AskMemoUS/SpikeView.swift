@@ -12,6 +12,7 @@ struct SpikeView: View {
   @State private var isAsking = false
   @State private var appCheckStatus: String?
   @State private var route: AskRoute = .hybrid
+  @FocusState private var questionFocused: Bool
   /// "undecided" until the parent answers the cloud question once; kept on this phone.
   @AppStorage("cloudConsent") private var cloudConsent = "undecided"
   private var cloudAllowed: Bool { cloudConsent == "allowed" }
@@ -35,6 +36,7 @@ struct SpikeView: View {
         Section("On-device model") { Text(statusText) }
         Section("Question") {
           TextField("Ask about the notes", text: $question, axis: .vertical)
+            .focused($questionFocused)
           Picker("Route", selection: $route) {
             ForEach(AskRoute.allCases) { Text($0.rawValue).tag($0) }
           }
@@ -61,6 +63,7 @@ struct SpikeView: View {
         }
         #endif
       }
+      .scrollDismissesKeyboard(.interactively)
       .navigationTitle("AskMemoUS spike")
     }
   }
@@ -136,6 +139,7 @@ struct SpikeView: View {
   }
 
   private func runAsk() async {
+    questionFocused = false
     isAsking = true
     defer { isAsking = false }
     answer = await ask.answer(question: question, child: Self.child, notes: Self.notes,
