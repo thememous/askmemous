@@ -101,11 +101,14 @@ public struct AskAnswer: Sendable, Hashable, Codable {
   public let outcome: AskOutcome
   public let source: AnswerSource
   public let modelVersion: String?
+  /// True when the on-device answer failed the checks and the cloud answered instead.
+  public let escalated: Bool
 
-  public init(outcome: AskOutcome, source: AnswerSource, modelVersion: String?) {
+  public init(outcome: AskOutcome, source: AnswerSource, modelVersion: String?, escalated: Bool = false) {
     self.outcome = outcome
     self.source = source
     self.modelVersion = modelVersion
+    self.escalated = escalated
   }
 }
 

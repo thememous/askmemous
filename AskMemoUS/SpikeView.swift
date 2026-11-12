@@ -53,7 +53,7 @@ struct SpikeView: View {
 
   @ViewBuilder
   private func answerSection(_ answer: AskAnswer) -> some View {
-    Section(sourceTitle(answer.source)) {
+    Section(answer.escalated ? "Checked on this iPhone, answered in the cloud" : sourceTitle(answer.source)) {
       switch answer.outcome {
       case let .tip(text, note):
         Text(text)

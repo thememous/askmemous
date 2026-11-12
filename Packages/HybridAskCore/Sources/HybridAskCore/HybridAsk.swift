@@ -22,17 +22,40 @@ public struct HybridAsk: Sendable {
     let numbered = AskPrompt.number(notes, now: now)
     guard !numbered.ids.isEmpty else { return .app(.noNotes) }
 
+    let instructions = AskPrompt.instructions(for: child)
+    let prompt = AskPrompt.prompt(question: q, child: child, numbered: numbered)
+
+    let first: AskAnswer
     do {
-      let result = try await model.draft(
-        instructions: AskPrompt.instructions(for: child),
-        prompt: AskPrompt.prompt(question: q, child: child, numbered: numbered),
-        route: route
-      )
-      let outcome = AskCheck.review(result.draft, notes: numbered.ids, child: child)
-      return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion)
+      first = try await attempt(instructions, prompt, route, q, child, numbered)
     } catch {
       return .app(.modelUnavailable)
     }
+
+    // Hybrid: when the on-device answer fails the checks, ask the cloud once.
+    // Offline (or if the cloud also fails), the honest on-device floor stands.
+    guard route == .hybrid, first.source == .onDevice, first.outcome == .floor(.noSupportingNote) else {
+      return first
+    }
+    do {
+      let second = try await attempt(instructions, prompt, .cloudOnly, q, child, numbered)
+      return AskAnswer(outcome: second.outcome, source: second.source,
+                       modelVersion: second.modelVersion, escalated: true)
+    } catch {
+      return first
+    }
+  }
+
+  private func attempt(
+    _ instructions: String, _ prompt: String, _ route: AskRoute,
+    _ question: String, _ child: AskChild, _ numbered: AskPrompt.Numbered
+  ) async throws -> AskAnswer {
+    let result = try await model.draft(instructions: instructions, prompt: prompt, route: route)
+    var outcome = AskCheck.review(result.draft, notes: numbered.ids, child: child)
+    if case let .tip(_, note) = outcome, !AskCheck.isRelevant(question: question, note: note) {
+      outcome = .floor(.noSupportingNote)
+    }
+    return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion)
   }
 }
 

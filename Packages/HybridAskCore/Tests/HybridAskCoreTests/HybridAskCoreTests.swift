@@ -12,11 +12,14 @@ private let notes = [
   AskNote(text: "Slept to 6:40 on the day we skipped the late snack.", category: "sleep", createdAt: daysAgo(6)),
 ]
 
-/// Returns a fixed draft and records what it was asked.
+/// Returns a fixed draft per route and records what it was asked.
 private final class FakeModel: AskModel, @unchecked Sendable {
   var draft: AskDraft
+  var cloudDraft: AskDraft?
   var shouldThrow = false
-  var calls = 0
+  var cloudThrows = false
+  var routes: [AskRoute] = []
+  var calls: Int { routes.count }
   var lastPrompt = ""
   var lastInstructions = ""
 
@@ -24,10 +27,14 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 
   func draft(instructions: String, prompt: String, route: AskRoute) async throws
     -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
-    calls += 1
+    routes.append(route)
     lastPrompt = prompt
     lastInstructions = instructions
     if shouldThrow { throw URLError(.notConnectedToInternet) }
+    if route == .cloudOnly {
+      if cloudThrows { throw URLError(.notConnectedToInternet) }
+      return (cloudDraft ?? draft, .cloud, "cloud-model")
+    }
     return (draft, .onDevice, "test-model")
   }
 }
@@ -167,4 +174,58 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   let record = AskRecord(askedAt: now, question: "5am?", child: mia, answer: answer)
   let data = try JSONEncoder().encode(record)
   #expect(try JSONDecoder().decode(AskRecord.self, from: data) == record)
+}
+
+// MARK: - Relevance + escalation
+
+@Test func topicsAreFoundInPlainWords() {
+  #expect(AskTopic.of("She keeps waking at 5am") == [.sleep])
+  #expect(AskTopic.of("Why is Ethan so curious?").contains(.curiosity))
+  #expect(AskTopic.of(notes[2]).isSuperset(of: [.sleep, .food]))
+}
+
+@Test func offTopicNoteIsRejected() {
+  #expect(!AskCheck.isRelevant(question: "Why is Ethan so curious?", note: notes[1]))
+  #expect(AskCheck.isRelevant(question: "She keeps waking at 5am", note: notes[2]))
+  #expect(AskCheck.isRelevant(question: "Any ideas for tomorrow?", note: notes[1]))
+}
+
+@Test func offTopicOnDeviceAnswerEscalatesToCloud() async {
+  let model = FakeModel(AskDraft(noteId: "n2", tip: "Take a walk to explore."))
+  model.cloudDraft = AskDraft(noteId: "none", tip: "")
+  let answer = await HybridAsk(model: model).answer(
+    question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
+  )
+  #expect(model.routes == [.hybrid, .cloudOnly])
+  #expect(answer.outcome == .floor(.noSupportingNote))
+  #expect(answer.source == .cloud)
+  #expect(answer.escalated)
+}
+
+@Test func offlineEscalationKeepsTheHonestFloor() async {
+  let model = FakeModel(AskDraft(noteId: "n2", tip: "Take a walk to explore."))
+  model.cloudThrows = true
+  let answer = await HybridAsk(model: model).answer(
+    question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
+  )
+  #expect(answer.outcome == .floor(.noSupportingNote))
+  #expect(answer.source == .onDevice)
+  #expect(!answer.escalated)
+}
+
+@Test func goodOnDeviceAnswerNeverCallsTheCloud() async {
+  let model = FakeModel(AskDraft(noteId: "n3", tip: "Skip the late snack again."))
+  let answer = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
+  )
+  #expect(model.routes == [.hybrid])
+  #expect(!answer.escalated)
+}
+
+@Test func onDeviceOnlyRouteNeverEscalates() async {
+  let model = FakeModel(AskDraft(noteId: "none", tip: ""))
+  _ = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am.", child: mia, notes: notes, route: .onDeviceOnly, now: now
+  )
+  #expect(model.routes == [.onDeviceOnly])
 }
