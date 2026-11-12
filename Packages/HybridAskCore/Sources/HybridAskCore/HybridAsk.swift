@@ -55,7 +55,7 @@ public enum FloorText {
     case .medicalTopic:
       "That's a question for \(childName)'s paediatrician or nurse. If you're worried, it's always fine to ask them."
     case .modelUnavailable:
-      "Couldn't answer right now. Your question is saved — try again in a moment."
+      "Couldn't get an answer right now. Check your connection, or try again in a moment."
     }
   }
 

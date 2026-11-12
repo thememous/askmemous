@@ -36,7 +36,7 @@ public enum AskPrompt {
     var rules = [
       "You help a parent decide one small thing to try with their child.",
       "Speak to the parent, never to the child. Do not greet anyone.",
-      "Choose the ONE note that best supports a tip and give its id in noteId.",
+      "Choose the ONE note that speaks most directly to the question (same topic first) and give its id in noteId.",
       "If no note supports a tip for this question, set noteId to none and leave tip empty.",
       "The tip is one or two short sentences: one thing they can try soon. No lists. No second tip.",
       "Only use what the notes say. Do not invent events, interests, milestones, or delays.",

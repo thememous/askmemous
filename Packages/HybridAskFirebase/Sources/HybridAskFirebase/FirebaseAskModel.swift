@@ -7,7 +7,12 @@ import HybridAskCore
 /// text about the notes) is what lets the app check the answer.
 @Generable
 struct TipDraft {
-  @Guide(description: "The id of the one note this tip is based on, such as n2. Write none if no note supports a tip.")
+  // Generated first on purpose: naming the link before choosing makes a small
+  // model pick the note that actually answers the question. Not shown to parents.
+  @Guide(description: "In a few words: which note speaks most directly to the parent's question, and why. Prefer a note about the same thing the question is about.")
+  var link: String
+
+  @Guide(description: "The id of that note, such as n2. Write none if no note speaks to the question.")
   var noteId: String
 
   @Guide(description: "One small thing the parent can try soon, in one or two short sentences, speaking to the parent. Empty if noteId is none.")
