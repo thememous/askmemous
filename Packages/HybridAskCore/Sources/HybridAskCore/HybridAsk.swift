@@ -58,7 +58,8 @@ public struct HybridAsk: Sendable {
       guard canEscalate else { return .app(.modelUnavailable, detail: why) }
       guard cloudAllowed else { return .app(.modelUnavailable, cloudCouldHelp: true, detail: why) }
       do {
-        return try await run(.cloudOnly).escalatedCopy(detail: why)
+        let second = try await run(.cloudOnly)
+        return second.escalatedCopy(detail: [why, second.detail].compactMap { $0 }.joined(separator: "\n"))
       } catch {
         return .app(.modelUnavailable, detail: why + " | cloud failed: \(String(describing: error))")
       }
@@ -71,7 +72,9 @@ public struct HybridAsk: Sendable {
       return first
     }
     guard cloudAllowed else { return first.cloudCouldHelpCopy }
-    if let second = try? await run(.cloudOnly) { return second.escalatedCopy }
+    if let second = try? await run(.cloudOnly) {
+      return second.escalatedCopy(detail: [first.detail, second.detail].compactMap { $0 }.joined(separator: "\n"))
+    }
     return first
   }
 
@@ -88,7 +91,9 @@ public struct HybridAsk: Sendable {
         outcome = .floor(.noSupportingNote)
       }
     }
-    return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion)
+    let d = result.draft
+    let drafted = "\(route.rawValue) drafted: \(d.noteId) · “\(d.object)” · \(d.dayWas.rawValue)"
+    return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: drafted)
   }
 }
 
@@ -101,7 +106,7 @@ extension AskAnswer {
     AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: true, detail: detail)
   }
   var cloudCouldHelpCopy: AskAnswer {
-    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, cloudCouldHelp: true)
+    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, cloudCouldHelp: true, detail: detail)
   }
 }
 
