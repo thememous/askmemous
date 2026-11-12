@@ -28,6 +28,10 @@ public enum AskCheck {
     tip = firstSentences(tip, maxSentences)
     guard !tip.isEmpty else { return .floor(.noSupportingNote) }
     if mentionsMedical(tip) { return .floor(.medicalTopic) }
+    if let quote = draft.quote {
+      guard quoteIsInNote(quote, note: note) else { return .floor(.noSupportingNote) }
+      guard keepsDirection(quote: quote, tip: tip) else { return .floor(.noSupportingNote) }
+    }
     return .tip(text: tip, basedOn: note)
   }
 
@@ -79,5 +83,42 @@ public enum AskCheck {
       if let s = s?.trimmingCharacters(in: .whitespaces), !s.isEmpty { out.append(s) }
     }
     return out.isEmpty && !text.isEmpty ? [text] : out
+  }
+
+  // MARK: - Quote and direction
+
+  /// The quote must be real words from the note (at least two), ignoring case,
+  /// spacing and punctuation.
+  public static func quoteIsInNote(_ quote: String, note: AskNote) -> Bool {
+    let q = normalized(quote)
+    guard q.split(separator: " ").count >= 2 else { return false }
+    return normalized(note.text).contains(q)
+  }
+
+  /// Word starts that mean "left something out" in a note…
+  static let leftOutStems = ["skip", "without", "stopp", "dropp", "avoid", "cut", "remov"]
+  static let leftOutWords: Set<String> = ["no", "not", "never", "didn", "didnt", "don", "dont", "none"]
+  /// …and in a tip, ways of saying "leave it out" or "change it".
+  static let changeStems = leftOutStems + ["leave", "hold", "pause", "less", "fewer", "earlier",
+                                           "instead", "smaller", "lighter", "move", "swap", "replac"]
+
+  /// When the note's quote is about leaving something out, the tip must also
+  /// leave it out or change it. "Skipped the late snack" must never become
+  /// "offer the late snack again".
+  public static func keepsDirection(quote: String, tip: String) -> Bool {
+    guard hasAny(quote, stems: leftOutStems, words: leftOutWords) else { return true }
+    return hasAny(tip, stems: changeStems, words: leftOutWords)
+  }
+
+  static func hasAny(_ text: String, stems: [String], words: Set<String>) -> Bool {
+    let tokens = text.lowercased().split { !$0.isLetter }.map(String.init)
+    return tokens.contains { t in words.contains(t) || stems.contains { t.hasPrefix($0) } }
+  }
+
+  static func normalized(_ text: String) -> String {
+    text.lowercased()
+      .map { $0.isLetter || $0.isNumber ? $0 : " " }
+      .reduce(into: "") { $0.append($1) }
+      .split(separator: " ").joined(separator: " ")
   }
 }

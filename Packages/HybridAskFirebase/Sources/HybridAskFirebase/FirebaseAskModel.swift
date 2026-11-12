@@ -15,7 +15,10 @@ struct TipDraft {
   @Guide(description: "The id of that note, such as n2. Write none if no note speaks to the question.")
   var noteId: String
 
-  @Guide(description: "One small thing the parent can try soon, in one or two short sentences, speaking to the parent. Empty if noteId is none.")
+  @Guide(description: "Copy the exact words from that note that the tip builds on, word for word. Empty if noteId is none.")
+  var quote: String
+
+  @Guide(description: "One small thing the parent can try soon that follows what the quoted words show (if something was left out on a better day, suggest leaving it out again), in one or two short sentences, speaking to the parent. Empty if noteId is none.")
   var tip: String
 }
 
@@ -50,7 +53,7 @@ public struct FirebaseAskModel: AskModel {
     let response = try await session.respond(to: prompt, generating: TipDraft.self)
     let version = response.rawResponse.modelVersion ?? ""
     return (
-      AskDraft(noteId: response.content.noteId, tip: response.content.tip),
+      AskDraft(noteId: response.content.noteId, quote: response.content.quote, tip: response.content.tip),
       version == Self.onDeviceModelVersion ? .onDevice : .cloud,
       version
     )

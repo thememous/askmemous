@@ -58,10 +58,14 @@ public enum AnswerSource: String, Sendable, Codable {
 /// What the model is asked to return: one note id (or "none") and one tip.
 public struct AskDraft: Sendable, Hashable {
   public let noteId: String
+  /// The exact words from the note the tip builds on. When present, the app
+  /// checks they really appear in the note and that the tip keeps their direction.
+  public let quote: String?
   public let tip: String
 
-  public init(noteId: String, tip: String) {
+  public init(noteId: String, quote: String? = nil, tip: String) {
     self.noteId = noteId
+    self.quote = quote
     self.tip = tip
   }
 }

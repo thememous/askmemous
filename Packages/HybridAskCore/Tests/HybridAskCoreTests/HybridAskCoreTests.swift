@@ -229,3 +229,38 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   )
   #expect(model.routes == [.onDeviceOnly])
 }
+
+// MARK: - Quote + direction
+
+@Test func quoteMustBeRealWordsFromTheNote() {
+  #expect(AskCheck.quoteIsInNote("skipped the late snack", note: notes[2]))
+  #expect(AskCheck.quoteIsInNote("Skipped  the LATE snack.", note: notes[2]))
+  #expect(!AskCheck.quoteIsInNote("gave her a late snack", note: notes[2]))
+  #expect(!AskCheck.quoteIsInNote("snack", note: notes[2]))
+}
+
+@Test func reversedAdviceIsRejected() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  let reversed = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Offer the late snack again soon.")
+  #expect(AskCheck.review(reversed, notes: ids, child: mia) == .floor(.noSupportingNote))
+  let kept = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Try skipping the late snack this week.")
+  #expect(AskCheck.review(kept, notes: ids, child: mia) == .tip(text: "Try skipping the late snack this week.", basedOn: ids["n3"]!))
+  let moved = AskDraft(noteId: "n3", quote: "we skipped the late snack", tip: "Move the snack earlier, before bath.")
+  #expect(AskCheck.review(moved, notes: ids, child: mia) != .floor(.noSupportingNote))
+}
+
+@Test func madeUpQuoteIsRejected() {
+  let ids = AskPrompt.number(notes, now: now).ids
+  let draft = AskDraft(noteId: "n2", quote: "loves exploring the garden", tip: "Try a garden walk.")
+  #expect(AskCheck.review(draft, notes: ids, child: mia) == .floor(.noSupportingNote))
+}
+
+@Test func reversedOnDeviceAnswerEscalates() async {
+  let model = FakeModel(AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Offer the late snack again soon."))
+  model.cloudDraft = AskDraft(noteId: "n3", quote: "skipped the late snack", tip: "Try skipping the late snack this week.")
+  let answer = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
+  )
+  #expect(answer.escalated)
+  #expect(answer.outcome == .tip(text: "Try skipping the late snack this week.", basedOn: notes[2]))
+}
