@@ -13,7 +13,20 @@ public enum AskPrompt {
     public let lines: [String]
   }
 
-  public static func number(_ notes: [AskNote], now: Date) -> Numbered {
+  /// What every model sees instead of the child's name. The name is never sent to
+  /// any model, on-device or cloud: tips don't need it, and the cloud shouldn't have it.
+  public static let childStandIn = "your child"
+
+  /// Replaces the child's name (whole word, as written) with "your child".
+  /// Case-sensitive on purpose, so a child called May doesn't change "may".
+  public static func redact(_ text: String, name: String) -> String {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else { return text }
+    let pattern = "(?<![\\p{L}\\p{N}])" + NSRegularExpression.escapedPattern(for: name) + "(?![\\p{L}\\p{N}])"
+    return text.replacingOccurrences(of: pattern, with: childStandIn, options: .regularExpression)
+  }
+
+  public static func number(_ notes: [AskNote], now: Date, childName: String = "") -> Numbered {
     let recent = notes
       .filter { !clip($0.text, noteMaxChars).isEmpty }
       .prefix(noteLimit)
@@ -26,7 +39,7 @@ public enum AskPrompt {
       let stamp = [when(note.createdAt, now: now), category.isEmpty ? nil : category]
         .compactMap { $0 }
         .joined(separator: " · ")
-      lines.append("\(id) [\(stamp)] \(clip(note.text, noteMaxChars))")
+      lines.append("\(id) [\(stamp)] \(clip(redact(note.text, name: childName), noteMaxChars))")
     }
     return Numbered(ids: ids, lines: lines)
   }
@@ -47,13 +60,13 @@ public enum AskPrompt {
   }
 
   public static func prompt(question: String, child: AskChild, numbered: Numbered) -> String {
-    let header = child.ageMonths.map { "\(child.name), \($0) months old" } ?? child.name
+    let header = child.ageMonths.map { "\(childStandIn), \($0) months old" } ?? childStandIn
     return """
     Child: \(header)
     Notes (most relevant first):
     \(numbered.lines.joined(separator: "\n"))
 
-    Parent's question: \(clip(question, questionMaxChars))
+    Parent's question: \(clip(redact(question, name: child.name), questionMaxChars))
     """
   }
 

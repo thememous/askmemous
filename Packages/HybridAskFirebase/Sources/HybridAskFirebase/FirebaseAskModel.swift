@@ -33,9 +33,6 @@ public struct FirebaseAskModel: AskModel {
   /// A "billing not required" model on the Firebase AI Logic models list.
   public static let defaultCloudModel = "gemini-3.5-flash-lite"
 
-  /// What Apple's on-device model reports as its version.
-  static let onDeviceModelVersion = "apple-foundation-models-system-language-model"
-
   let cloudModelName: String
 
   public init(cloudModelName: String = FirebaseAskModel.defaultCloudModel) {
@@ -66,7 +63,7 @@ public struct FirebaseAskModel: AskModel {
         case .unclear: .unclear
         }
       }()),
-      version == Self.onDeviceModelVersion ? .onDevice : .cloud,
+      AnswerSource.from(modelVersion: version),
       version
     )
   }

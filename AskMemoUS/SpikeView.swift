@@ -12,6 +12,9 @@ struct SpikeView: View {
   @State private var isAsking = false
   @State private var appCheckStatus: String?
   @State private var route: AskRoute = .hybrid
+  /// "undecided" until the parent answers the cloud question once; kept on this phone.
+  @AppStorage("cloudConsent") private var cloudConsent = "undecided"
+  private var cloudAllowed: Bool { cloudConsent == "allowed" }
 
   private let ask = HybridAsk(model: FirebaseAskModel())
 
@@ -39,7 +42,18 @@ struct SpikeView: View {
           Button(isAsking ? "Asking…" : "Ask") { Task { await runAsk() } }
             .disabled(isAsking)
         }
-        if let answer { answerSection(answer) }
+        if let answer {
+          answerSection(answer)
+          if answer.cloudCouldHelp && cloudConsent == "undecided" { consentSection }
+        }
+        Section {
+          Toggle("Allow cloud checks", isOn: Binding(
+            get: { cloudAllowed },
+            set: { cloudConsent = $0 ? "allowed" : "declined" }
+          ))
+        } footer: {
+          Text(Self.cloudExplainer)
+        }
         #if DEBUG
         Section("App Check (debug)") {
           Button("Get App Check token") { Task { await fetchAppCheckToken() } }
@@ -71,6 +85,26 @@ struct SpikeView: View {
       }
     }
   }
+
+  /// Asked once, the first time a cloud check could help.
+  private var consentSection: some View {
+    Section("Check this in the cloud?") {
+      Text("This iPhone couldn't find a good answer in your notes. A cloud model might.")
+      Text(Self.cloudExplainer).font(.footnote).foregroundStyle(.secondary)
+      Button("Check in the cloud") {
+        cloudConsent = "allowed"
+        Task { await runAsk() }
+      }
+      Button("Keep it on this iPhone", role: .cancel) { cloudConsent = "declined" }
+    }
+  }
+
+  static let cloudExplainer = """
+  When on, a question this iPhone can't answer well goes to Google's Gemini through Firebase, \
+  with up to 5 of your notes. \(child.name)'s name is replaced with "your child" first. \
+  On the free plan, Google may use what's sent to improve its products. \
+  Your notes and saved questions otherwise stay on this iPhone.
+  """
 
   private func sourceTitle(_ source: AnswerSource) -> String {
     switch source {
@@ -104,6 +138,7 @@ struct SpikeView: View {
   private func runAsk() async {
     isAsking = true
     defer { isAsking = false }
-    answer = await ask.answer(question: question, child: Self.child, notes: Self.notes, route: route)
+    answer = await ask.answer(question: question, child: Self.child, notes: Self.notes,
+                              route: route, cloudAllowed: cloudAllowed)
   }
 }

@@ -18,6 +18,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   var cloudDraft: AskDraft?
   var shouldThrow = false
   var cloudThrows = false
+  var onDeviceThrows = false
   var routes: [AskRoute] = []
   var calls: Int { routes.count }
   var lastPrompt = ""
@@ -31,6 +32,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
     lastPrompt = prompt
     lastInstructions = instructions
     if shouldThrow { throw URLError(.notConnectedToInternet) }
+    if onDeviceThrows && route != .cloudOnly { throw URLError(.cannotDecodeContentData) }
     if route == .cloudOnly {
       if cloudThrows { throw URLError(.notConnectedToInternet) }
       return (cloudDraft ?? draft, .cloud, "cloud-model")
@@ -248,7 +250,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   let model = FakeModel(AskDraft(noteId: "n2", object: "after the park", dayWas: .better))
   model.cloudDraft = AskDraft(noteId: "none", object: "", dayWas: .unclear)
   let answer = await HybridAsk(model: model).answer(
-    question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
+    question: "Why is Ethan so curious?", child: mia, notes: notes, cloudAllowed: true, now: now
   )
   #expect(model.routes == [.hybrid, .cloudOnly])
   #expect(answer.outcome == .floor(.noSupportingNote))
@@ -260,7 +262,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   let model = FakeModel(AskDraft(noteId: "n2", object: "after the park", dayWas: .better))
   model.cloudThrows = true
   let answer = await HybridAsk(model: model).answer(
-    question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
+    question: "Why is Ethan so curious?", child: mia, notes: notes, cloudAllowed: true, now: now
   )
   #expect(answer.outcome == .floor(.noSupportingNote))
   #expect(answer.source == .onDevice)
@@ -270,7 +272,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 @Test func goodOnDeviceAnswerNeverCallsTheCloud() async {
   let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
   let answer = await HybridAsk(model: model).answer(
-    question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
+    question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
   )
   #expect(model.routes == [.hybrid])
   #expect(!answer.escalated)
@@ -288,8 +290,83 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse))
   model.cloudDraft = AskDraft(noteId: "n3", object: "the late snack", dayWas: .better)
   let answer = await HybridAsk(model: model).answer(
-    question: "She keeps waking at 5am.", child: mia, notes: notes, now: now
+    question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
   )
   #expect(answer.escalated)
   #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
+}
+
+// MARK: - Cloud consent + the child's name
+
+@Test func withoutConsentNothingLeavesThePhone() async {
+  let model = FakeModel(AskDraft(noteId: "n2", object: "after the park", dayWas: .better))
+  let answer = await HybridAsk(model: model).answer(
+    question: "Why is Ethan so curious?", child: mia, notes: notes, now: now
+  )
+  #expect(model.routes == [.onDeviceOnly])
+  #expect(answer.outcome == .floor(.noSupportingNote))
+  #expect(answer.cloudCouldHelp)
+  #expect(!answer.escalated)
+}
+
+@Test func goodAnswerWithoutConsentDoesNotOfferTheCloud() async {
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  let answer = await HybridAsk(model: model).answer(question: "She keeps waking at 5am.", child: mia, notes: notes, now: now)
+  #expect(!answer.cloudCouldHelp)
+}
+
+@Test func cloudOnlyNeedsConsent() async {
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  let answer = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am.", child: mia, notes: notes, route: .cloudOnly, now: now
+  )
+  #expect(answer.outcome == .floor(.cloudNotAllowed))
+  #expect(model.calls == 0)
+}
+
+@Test func onDeviceErrorEscalatesWithConsent() async {
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  model.onDeviceThrows = true
+  let answer = await HybridAsk(model: model).answer(
+    question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
+  )
+  #expect(model.routes == [.hybrid, .cloudOnly])
+  #expect(answer.escalated)
+  #expect(answer.source == .cloud)
+}
+
+@Test func onDeviceErrorWithoutConsentOffersTheCloud() async {
+  let model = FakeModel(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better))
+  model.onDeviceThrows = true
+  let answer = await HybridAsk(model: model).answer(question: "She keeps waking at 5am.", child: mia, notes: notes, now: now)
+  #expect(model.routes == [.onDeviceOnly])
+  #expect(answer.outcome == .floor(.modelUnavailable))
+  #expect(answer.cloudCouldHelp)
+}
+
+@Test func theChildsNameIsNeverSentToAModel() async {
+  let named = notes + [AskNote(text: "Mia slept to 7 when we kept Mia's room dark.", category: "sleep", createdAt: daysAgo(1))]
+  let model = FakeModel(AskDraft(noteId: "n1", object: "your child's room dark", dayWas: .better))
+  let answer = await HybridAsk(model: model).answer(
+    question: "Mia keeps waking at 5am. What could I try?", child: mia, notes: named, cloudAllowed: true, now: now
+  )
+  #expect(!model.lastPrompt.contains("Mia"))
+  #expect(!model.lastInstructions.contains("Mia"))
+  #expect(model.lastPrompt.contains("your child"))
+  // The object copied from the redacted note still checks out; the parent sees their own note.
+  guard case let .tip(text, note) = answer.outcome else { Issue.record("expected tip, got \(answer.outcome)"); return }
+  #expect(note.text.hasPrefix("Mia slept to 7"))
+  #expect(!text.contains("Mia"))
+}
+
+@Test func redactionIsWholeWordAndCaseSensitive() {
+  #expect(AskPrompt.redact("May may nap. Mayfield. May's cup.", name: "May") == "your child may nap. Mayfield. your child's cup.")
+  #expect(AskPrompt.redact("No name here.", name: "") == "No name here.")
+}
+
+@Test func sourceComesFromTheReportedVersion() {
+  #expect(AnswerSource.from(modelVersion: "apple-foundation-models-system-language-model") == .onDevice)
+  #expect(AnswerSource.from(modelVersion: "gemini-3.5-flash-lite") == .cloud)
+  #expect(AnswerSource.from(modelVersion: nil) == .cloud)
+  #expect(AnswerSource.from(modelVersion: "") == .cloud)
 }

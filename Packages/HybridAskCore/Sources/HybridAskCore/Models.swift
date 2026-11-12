@@ -53,6 +53,15 @@ public enum AnswerSource: String, Sendable, Codable {
   case cloud
   /// No model was asked: the app answered with a fixed reply.
   case app
+
+  /// What Apple's on-device model reports as its version (Firebase AI Logic hybrid, iOS 26).
+  public static let onDeviceModelVersion = "apple-foundation-models-system-language-model"
+
+  /// Which model answered, from the version string the SDK reports.
+  /// An unknown or empty version is taken as the cloud, so a cloud answer is never labelled on-device.
+  public static func from(modelVersion: String?) -> AnswerSource {
+    modelVersion == onDeviceModelVersion ? .onDevice : .cloud
+  }
 }
 
 /// How the day in the chosen note went.
@@ -114,6 +123,8 @@ public enum FloorReason: String, Sendable, Codable {
   /// The model's tip touched an age-specific safety rule.
   case unsafeTip
   case modelUnavailable
+  /// Cloud-only was asked for, but the parent hasn't allowed cloud checks.
+  case cloudNotAllowed
 }
 
 /// What the parent sees.
@@ -130,12 +141,17 @@ public struct AskAnswer: Sendable, Hashable, Codable {
   public let modelVersion: String?
   /// True when the on-device answer failed the checks and the cloud answered instead.
   public let escalated: Bool
+  /// True when a cloud check might do better but the parent hasn't allowed the cloud.
+  /// The app can then ask: nothing leaves the phone until they say yes.
+  public let cloudCouldHelp: Bool
 
-  public init(outcome: AskOutcome, source: AnswerSource, modelVersion: String?, escalated: Bool = false) {
+  public init(outcome: AskOutcome, source: AnswerSource, modelVersion: String?,
+              escalated: Bool = false, cloudCouldHelp: Bool = false) {
     self.outcome = outcome
     self.source = source
     self.modelVersion = modelVersion
     self.escalated = escalated
+    self.cloudCouldHelp = cloudCouldHelp
   }
 }
 

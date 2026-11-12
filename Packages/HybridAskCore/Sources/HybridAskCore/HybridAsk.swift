@@ -8,11 +8,15 @@ public struct HybridAsk: Sendable {
     self.model = model
   }
 
+  /// - Parameter cloudAllowed: whether the parent has allowed cloud checks. Without it,
+  ///   nothing leaves the phone: `.hybrid` runs on-device only and marks answers the
+  ///   cloud might improve with `cloudCouldHelp`, so the app can ask.
   public func answer(
     question: String,
     child: AskChild,
     notes: [AskNote],
     route: AskRoute = .hybrid,
+    cloudAllowed: Bool = false,
     now: Date = Date()
   ) async -> AskAnswer {
     let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -24,33 +28,47 @@ public struct HybridAsk: Sendable {
     case nil: break
     }
 
+    // Only the few notes that matter, with the child's name replaced, go to any model.
     let selected = AskRetrieval.select(notes, question: q, limit: AskRetrieval.defaultLimit)
-    let numbered = AskPrompt.number(selected, now: now)
+    let numbered = AskPrompt.number(selected, now: now, childName: child.name)
     guard !numbered.ids.isEmpty else { return .app(.noNotes) }
 
     let instructions = AskPrompt.instructions(for: child)
     let prompt = AskPrompt.prompt(question: q, child: child, numbered: numbered)
+    func run(_ r: AskRoute) async throws -> AskAnswer {
+      try await attempt(instructions, prompt, r, q, child, numbered)
+    }
+
+    let firstRoute: AskRoute
+    switch route {
+    case .onDeviceOnly: firstRoute = .onDeviceOnly
+    case .cloudOnly:
+      guard cloudAllowed else { return .app(.cloudNotAllowed) }
+      firstRoute = .cloudOnly
+    case .hybrid: firstRoute = cloudAllowed ? .hybrid : .onDeviceOnly
+    }
+    let canEscalate = route == .hybrid
 
     let first: AskAnswer
     do {
-      first = try await attempt(instructions, prompt, route, q, child, numbered)
+      first = try await run(firstRoute)
     } catch {
+      // On-device errors (guardrails, context size, model not ready) escalate too.
+      guard canEscalate else { return .app(.modelUnavailable) }
+      guard cloudAllowed else { return .app(.modelUnavailable, cloudCouldHelp: true) }
+      if let second = try? await run(.cloudOnly) { return second.escalatedCopy }
       return .app(.modelUnavailable)
     }
 
     // Hybrid: when the on-device answer fails the checks, ask the cloud once.
     // Offline (or if the cloud also fails), the honest on-device floor stands.
     let retryable: Set<AskOutcome> = [.floor(.noSupportingNote), .floor(.unsafeTip)]
-    guard route == .hybrid, first.source == .onDevice, retryable.contains(first.outcome) else {
+    guard canEscalate, first.source == .onDevice, retryable.contains(first.outcome) else {
       return first
     }
-    do {
-      let second = try await attempt(instructions, prompt, .cloudOnly, q, child, numbered)
-      return AskAnswer(outcome: second.outcome, source: second.source,
-                       modelVersion: second.modelVersion, escalated: true)
-    } catch {
-      return first
-    }
+    guard cloudAllowed else { return first.cloudCouldHelpCopy }
+    if let second = try? await run(.cloudOnly) { return second.escalatedCopy }
+    return first
   }
 
   private func attempt(
@@ -71,8 +89,14 @@ public struct HybridAsk: Sendable {
 }
 
 extension AskAnswer {
-  static func app(_ reason: FloorReason) -> AskAnswer {
-    AskAnswer(outcome: .floor(reason), source: .app, modelVersion: nil)
+  static func app(_ reason: FloorReason, cloudCouldHelp: Bool = false) -> AskAnswer {
+    AskAnswer(outcome: .floor(reason), source: .app, modelVersion: nil, cloudCouldHelp: cloudCouldHelp)
+  }
+  var escalatedCopy: AskAnswer {
+    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: true)
+  }
+  var cloudCouldHelpCopy: AskAnswer {
+    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, cloudCouldHelp: true)
   }
 }
 
@@ -95,7 +119,9 @@ public enum FloorText {
     case .unsafeTip:
       "We won't suggest repeating that one. For sleep, feeding and car-seat safety at \(childName)'s age, your doctor or local health service has the current guidance."
     case .modelUnavailable:
-      "Couldn't get an answer right now. Check your connection, or try again in a moment."
+      "Couldn't get an answer this time. Try again in a moment, or ask it a different way."
+    case .cloudNotAllowed:
+      "Cloud checks are off. Turn them on to send this question to the cloud, or ask on this iPhone."
     }
   }
 

@@ -10,13 +10,16 @@ public enum AskCheck {
     let id = draft.noteId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     guard id != "none", let note = notes[id] else { return .floor(.noSupportingNote) }
 
+    // The model saw the note with the name replaced, so check against that same text.
+    let seen = AskPrompt.redact(note.text, name: child.name)
+
     // 1. The object must be the note's own words. We show the note's text, not the model's.
-    guard let found = locate(draft.object, in: note.text) else { return .floor(.noSupportingNote) }
+    guard let found = locate(draft.object, in: seen) else { return .floor(.noSupportingNote) }
 
     // 2. How did that day go? Only the note's own wording decides. A note that
     //    doesn't say ("Long nap after the park") is no evidence of a better day,
     //    whatever the model thinks. A model that disagrees with the note is refused.
-    let day = dayFromWording(note.text)
+    let day = dayFromWording(seen)
     guard day != .unclear, draft.dayWas == day || draft.dayWas == .unclear else {
       return .floor(.noSupportingNote)
     }
