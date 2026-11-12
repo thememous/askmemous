@@ -155,9 +155,14 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   // The note says better; a model claiming worse would flip the advice.
   #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse), notes: ids, child: mia)
     == .floor(.noSupportingNote))
-  // Note silent, model unsure: nothing to go on.
+  // Note silent: nothing to go on, even when the model calls it a better day (seen on device).
   #expect(AskCheck.review(AskDraft(noteId: "n2", object: "after the park", dayWas: .unclear), notes: ids, child: mia)
     == .floor(.noSupportingNote))
+  #expect(AskCheck.review(AskDraft(noteId: "n2", object: "Long nap 12–2:30 after the park", dayWas: .better),
+                          notes: ids, child: mia) == .floor(.noSupportingNote))
+  // Model unsure, note clear: the note decides.
+  #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .unclear), notes: ids, child: mia)
+    != .floor(.noSupportingNote))
 }
 
 @Test func unknownOrNoneNoteIsAFloor() {
