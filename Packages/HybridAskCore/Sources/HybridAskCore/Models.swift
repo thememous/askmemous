@@ -89,7 +89,14 @@ public enum FloorReason: String, Sendable, Codable {
   case emptyQuestion
   case noNotes
   case noSupportingNote
+  /// A health question: the app points to the child's doctor.
   case medicalTopic
+  /// Possible emergency: the app says to call emergency services now.
+  case emergency
+  /// The parent sounds overwhelmed: the app answers with support, not a tip.
+  case parentDistress
+  /// The model's tip touched an age-specific safety rule.
+  case unsafeTip
   case modelUnavailable
 }
 

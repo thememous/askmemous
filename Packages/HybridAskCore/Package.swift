@@ -11,7 +11,7 @@ let package = Package(
     .library(name: "HybridAskCore", targets: ["HybridAskCore"]),
   ],
   targets: [
-    .target(name: "HybridAskCore"),
+    .target(name: "HybridAskCore", resources: [.copy("Resources/eval-cases.json")]),
     .testTarget(name: "HybridAskCoreTests", dependencies: ["HybridAskCore"]),
   ]
 )
