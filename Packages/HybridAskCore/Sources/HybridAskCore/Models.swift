@@ -144,14 +144,17 @@ public struct AskAnswer: Sendable, Hashable, Codable {
   /// True when a cloud check might do better but the parent hasn't allowed the cloud.
   /// The app can then ask: nothing leaves the phone until they say yes.
   public let cloudCouldHelp: Bool
+  /// For debugging and the eval screen only (e.g. the on-device error). Never shown to parents.
+  public let detail: String?
 
   public init(outcome: AskOutcome, source: AnswerSource, modelVersion: String?,
-              escalated: Bool = false, cloudCouldHelp: Bool = false) {
+              escalated: Bool = false, cloudCouldHelp: Bool = false, detail: String? = nil) {
     self.outcome = outcome
     self.source = source
     self.modelVersion = modelVersion
     self.escalated = escalated
     self.cloudCouldHelp = cloudCouldHelp
+    self.detail = detail
   }
 }
 

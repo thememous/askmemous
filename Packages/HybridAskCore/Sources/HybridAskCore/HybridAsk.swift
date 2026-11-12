@@ -54,10 +54,14 @@ public struct HybridAsk: Sendable {
       first = try await run(firstRoute)
     } catch {
       // On-device errors (guardrails, context size, model not ready) escalate too.
-      guard canEscalate else { return .app(.modelUnavailable) }
-      guard cloudAllowed else { return .app(.modelUnavailable, cloudCouldHelp: true) }
-      if let second = try? await run(.cloudOnly) { return second.escalatedCopy }
-      return .app(.modelUnavailable)
+      let why = "\(firstRoute.rawValue) failed: \(String(describing: error))"
+      guard canEscalate else { return .app(.modelUnavailable, detail: why) }
+      guard cloudAllowed else { return .app(.modelUnavailable, cloudCouldHelp: true, detail: why) }
+      do {
+        return try await run(.cloudOnly).escalatedCopy(detail: why)
+      } catch {
+        return .app(.modelUnavailable, detail: why + " | cloud failed: \(String(describing: error))")
+      }
     }
 
     // Hybrid: when the on-device answer fails the checks, ask the cloud once.
@@ -89,11 +93,12 @@ public struct HybridAsk: Sendable {
 }
 
 extension AskAnswer {
-  static func app(_ reason: FloorReason, cloudCouldHelp: Bool = false) -> AskAnswer {
-    AskAnswer(outcome: .floor(reason), source: .app, modelVersion: nil, cloudCouldHelp: cloudCouldHelp)
+  static func app(_ reason: FloorReason, cloudCouldHelp: Bool = false, detail: String? = nil) -> AskAnswer {
+    AskAnswer(outcome: .floor(reason), source: .app, modelVersion: nil, cloudCouldHelp: cloudCouldHelp, detail: detail)
   }
-  var escalatedCopy: AskAnswer {
-    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: true)
+  var escalatedCopy: AskAnswer { escalatedCopy(detail: nil) }
+  func escalatedCopy(detail: String?) -> AskAnswer {
+    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: true, detail: detail)
   }
   var cloudCouldHelpCopy: AskAnswer {
     AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, cloudCouldHelp: true)

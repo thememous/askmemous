@@ -86,6 +86,11 @@ struct SpikeView: View {
       if let version = answer.modelVersion, !version.isEmpty {
         Text(version).font(.caption).foregroundStyle(.secondary)
       }
+      #if DEBUG
+      if let detail = answer.detail {
+        Text(detail).font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+      }
+      #endif
     }
   }
 
