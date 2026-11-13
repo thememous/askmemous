@@ -34,6 +34,15 @@ public struct EvalCaseResult: Codable, Sendable, Identifiable, Hashable {
   public let seconds: Double
   /// What the model returned, for reading failures.
   public let modelDetail: String?
+  /// What the case expects: tip, tipOrNone or floor. Optional so older saved reports still load.
+  public let expected: String?
+  /// A tip reached the parent (right or wrong).
+  public let gaveTip: Bool?
+
+  /// The case needed a tip and got the right one.
+  public var rightTip: Bool { expected == "tip" && passed }
+  /// A tip was shown that the case says is wrong (wrong note, unsafe, or no tip wanted).
+  public var wrongTip: Bool { gaveTip == true && !passed }
 }
 
 public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
@@ -43,14 +52,33 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
   public let results: [EvalCaseResult]
   /// False when the run was stopped before every case ran.
   public let complete: Bool
+  /// A reference row: what the app would score if the model never gave a tip.
+  public let isReference: Bool?
 
-  public var id: String { "\(variant.rawValue)|\(route.rawValue)" }
+  public init(variant: AskVariant, route: AskRoute, runAt: Date, results: [EvalCaseResult],
+              complete: Bool, isReference: Bool = false) {
+    self.variant = variant
+    self.route = route
+    self.runAt = runAt
+    self.results = results
+    self.complete = complete
+    self.isReference = isReference
+  }
+
+  public var id: String { "\(variant.rawValue)|\(isReference == true ? "never" : route.rawValue)" }
+  public var routeTitle: String { isReference == true ? "Never gives a tip" : route.rawValue }
 
   public var total: Int { results.count }
   public var passed: Int { results.filter(\.passed).count }
   public var heldoutTotal: Int { results.filter { $0.split == "heldout" }.count }
   public var heldoutPassed: Int { results.filter { $0.split == "heldout" && $0.passed }.count }
   public var unsafe: Int { results.filter(\.unsafe).count }
+  /// Cases that need a tip (expected outcome "tip").
+  public var tipCases: Int { results.filter { $0.expected == "tip" }.count }
+  public var rightTips: Int { results.filter(\.rightTip).count }
+  public var wrongTips: Int { results.filter(\.wrongTip).count }
+  /// False for reports saved before right/wrong tips were recorded.
+  public var hasTipCounts: Bool { results.allSatisfy { $0.expected != nil } }
   public var onDevice: Int { results.filter { $0.source == .onDevice }.count }
   public var cloud: Int { results.filter { $0.source == .cloud }.count }
   /// Answered by the app with no model call.
@@ -61,14 +89,16 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
   }
 
   public static let markdownHeader = """
-  | Variant | Route | Passed | Held-out | Unsafe tips shown | On device / cloud / app | Avg model s |
-  |---|---|---|---|---|---|---|
+  | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | On device / cloud / app | Avg model s |
+  |---|---|---|---|---|---|---|---|---|
   """
 
   public var markdownRow: String {
     let partial = complete ? "" : " (stopped)"
-    return "| \(variant.title) | \(route.rawValue)\(partial) | \(passed)/\(total) | \(heldoutPassed)/\(heldoutTotal) | "
-      + "\(unsafe) | \(onDevice) / \(cloud) / \(appOnly) | \(String(format: "%.1f", meanModelSeconds)) |"
+    let tips = hasTipCounts ? "\(rightTips)/\(tipCases) | \(wrongTips)" : "– | –"
+    let timing = isReference == true ? "– | –" : "\(onDevice) / \(cloud) / \(appOnly) | \(String(format: "%.1f", meanModelSeconds))"
+    return "| \(variant.title) | \(routeTitle)\(partial) | \(passed)/\(total) | \(heldoutPassed)/\(heldoutTotal) | "
+      + "\(tips) | \(unsafe) | \(timing) |"
   }
 }
 
@@ -115,19 +145,46 @@ public struct EvalRunner: Sendable {
                                 cloudAllowed: cloudAllowed, now: now)
       let elapsed = clock.now - start
       let graded = c.grade(answer, caseIdFor: built.caseIdFor)
-      let shown: String = switch answer.outcome {
-      case let .tip(text, _): text
-      case let .floor(reason): "[\(reason.rawValue)]"
+      let shown: String, gaveTip: Bool
+      switch answer.outcome {
+      case let .tip(text, _): (shown, gaveTip) = (text, true)
+      case let .floor(reason): (shown, gaveTip) = ("[\(reason.rawValue)]", false)
       }
       results.append(EvalCaseResult(
         id: c.id, split: c.split, passed: graded.passed, unsafe: graded.unsafe, grade: graded.detail,
         shown: shown, source: answer.source, escalated: answer.escalated,
         seconds: Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18,
-        modelDetail: answer.detail
+        modelDetail: answer.detail, expected: c.expect.outcome.rawValue, gaveTip: gaveTip
       ))
     }
     await progress(results.count, cases.count)
     return EvalReport(variant: variant, route: route, runAt: now, results: results,
                       complete: results.count == cases.count)
+  }
+
+  /// What each variant scores if the model always says no note fits. Any real run
+  /// should be compared with this: many cases pass by giving no tip at all.
+  public static func neverTipsReports(_ cases: [EvalCase], now: Date = Date()) async -> [EvalReport] {
+    let runner = EvalRunner(pointer: NeverTips(), writer: NeverTips())
+    var reports: [EvalReport] = []
+    for variant in AskVariant.allCases {
+      let r = await runner.run(cases, variant: variant, route: .onDeviceOnly, cloudAllowed: false, now: now)
+      reports.append(EvalReport(variant: variant, route: .onDeviceOnly, runAt: now, results: r.results,
+                                complete: r.complete, isReference: true))
+    }
+    return reports
+  }
+}
+
+/// A stand-in model that always answers "no note fits". No model is called.
+struct NeverTips: AskModel, FreeTextAskModel {
+  func draft(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    (AskDraft(noteId: "none", object: "", dayWas: .unclear), .app, "")
+  }
+
+  func write(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskFreeDraft, source: AnswerSource, modelVersion: String) {
+    (AskFreeDraft(noteId: "none", tip: ""), .app, "")
   }
 }

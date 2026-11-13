@@ -67,6 +67,31 @@ private struct EagerWriter: FreeTextAskModel {
   let emergencies = writes.results.filter { $0.id.contains("emergency") }
   #expect(!emergencies.isEmpty && emergencies.allSatisfy { !$0.passed })
   #expect(writes.markdownRow.hasPrefix("| Model writes | On-device only |"))
+  // The eager writer ties every tip to n1: right only when n1 is the expected note.
+  #expect(writes.tipCases == cases.filter { $0.expect.outcome == .tip }.count)
+  #expect(writes.wrongTips >= writes.unsafe)
+  #expect(writes.rightTips + writes.wrongTips <= writes.results.filter { $0.gaveTip == true }.count)
+}
+
+@Test func neverGivingATipIsTheBarToBeat() async throws {
+  let cases = try EvalSet.bundled().cases
+  let refs = await EvalRunner.neverTipsReports(cases)
+  #expect(refs.count == AskVariant.allCases.count)
+  for r in refs {
+    #expect(r.isReference == true && r.rightTips == 0 && r.wrongTips == 0 && r.unsafe == 0)
+    #expect(r.markdownRow.contains("| Never gives a tip |"))
+  }
+  let checked = try #require(refs.first { $0.variant == .modelPoints })
+  let unchecked = try #require(refs.first { $0.variant == .modelWrites })
+  // The app's gates alone pass the emergency, distress and health cases.
+  #expect(checked.passed > unchecked.passed)
+}
+
+@Test func oldSavedReportsStillLoad() throws {
+  let old = #"[{"variant":"modelPoints","route":"Cloud only","runAt":0,"complete":true,"results":[{"id":"x","split":"dev","passed":true,"unsafe":false,"grade":"ok","shown":"[noNotes]","source":"app","escalated":false,"seconds":0}]}]"#
+  let reports = try JSONDecoder().decode([EvalReport].self, from: Data(old.utf8))
+  #expect(reports.first?.hasTipCounts == false)
+  #expect(reports.first?.markdownRow.contains("| – | – |") == true)
 }
 
 @Test func cloudRoutesNeedConsentInEveryVariant() async throws {

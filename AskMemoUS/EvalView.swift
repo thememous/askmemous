@@ -16,6 +16,7 @@ struct EvalView: View {
   @State private var running: Task<Void, Never>?
   @State private var progress = (done: 0, total: 0)
   @State private var loadError: String?
+  @State private var references: [EvalReport] = []
 
   private let runner: EvalRunner = {
     let model = FirebaseAskModel()
@@ -57,12 +58,21 @@ struct EvalView: View {
       } header: {
         Text("Latest run of each")
       } footer: {
-        Text("Passed = the answer a parent would see matches what the case expects. Unsafe = a tip containing one of the case's forbidden phrases was shown. Model-written tips can be unsafe in words no case lists, so that number is a floor.")
+        Text("Passed = the answer a parent would see matches what the case expects. Right tips = cases that need a tip and got the right one. Wrong tips = a tip shown that the case says is wrong. Unsafe = a tip containing one of the case's forbidden phrases was shown. Model-written tips can be unsafe in words no case lists, so that number is a floor.")
+      }
+
+      Section {
+        ForEach(references) { ReportRow(report: $0) }
+      } header: {
+        Text("If the model never gave a tip")
+      } footer: {
+        Text("Worked out on the phone, no model called. Many cases pass by giving no tip at all, so a real run only helps parents if it beats these numbers with right tips.")
       }
 
       if !reports.isEmpty {
         Section {
-          ShareLink("Share as a table", item: EvalStore.markdown(sortedReports))
+          ShareLink("Share as a table", item: EvalStore.markdown(sortedReports + references))
+          ShareLink("Share details", item: EvalStore.details(sortedReports))
           Button("Clear results", role: .destructive) {
             reports = []
             EvalStore.save([])
@@ -72,6 +82,11 @@ struct EvalView: View {
     }
     .navigationTitle("Eval runner")
     .onDisappear { running?.cancel() }
+    .task {
+      if references.isEmpty, let cases = try? EvalSet.bundled().cases {
+        references = await EvalRunner.neverTipsReports(cases)
+      }
+    }
   }
 
   private var runFooter: String {
@@ -121,12 +136,20 @@ private struct ReportRow: View {
       HStack {
         Text(report.variant.title).font(.headline)
         Spacer()
-        Text(report.route.rawValue).font(.caption).foregroundStyle(.secondary)
+        Text(report.routeTitle).font(.caption).foregroundStyle(.secondary)
       }
       Text("Passed \(report.passed)/\(report.total) · held-out \(report.heldoutPassed)/\(report.heldoutTotal) · unsafe \(report.unsafe)")
         .monospacedDigit()
-      Text("On device \(report.onDevice) · cloud \(report.cloud) · app \(report.appOnly) · avg \(report.meanModelSeconds, format: .number.precision(.fractionLength(1))) s\(report.complete ? "" : " · stopped")")
+      if report.hasTipCounts {
+        Text("Right tips \(report.rightTips)/\(report.tipCases) · wrong tips shown \(report.wrongTips)")
+          .monospacedDigit()
+      } else {
+        Text("Run again to count right and wrong tips").font(.caption).foregroundStyle(.secondary)
+      }
+      if report.isReference != true {
+        Text("On device \(report.onDevice) · cloud \(report.cloud) · app \(report.appOnly) · avg \(report.meanModelSeconds, format: .number.precision(.fractionLength(1))) s\(report.complete ? "" : " · stopped")")
         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+      }
     }
   }
 }
@@ -177,6 +200,22 @@ enum EvalStore {
   static func save(_ reports: [EvalReport]) {
     try? FileManager.default.createDirectory(at: .applicationSupportDirectory, withIntermediateDirectories: true)
     try? JSONEncoder().encode(reports).write(to: url, options: .atomic)
+  }
+
+  /// Every case of every run, for reading failures (fictional cases only).
+  static func details(_ reports: [EvalReport]) -> String {
+    var lines: [String] = []
+    for r in reports {
+      lines.append("## \(r.variant.title) · \(r.routeTitle) · \(r.passed)/\(r.total)")
+      for c in r.results {
+        let mark = c.unsafe ? "UNSAFE" : c.passed ? "ok" : "FAIL"
+        lines.append("- \(mark) \(c.id) [\(c.expected ?? "?")] \(c.source.rawValue)\(c.escalated ? "+esc" : ""): \(c.shown)")
+        lines.append("  grade: \(c.grade)")
+        if let d = c.modelDetail { lines.append("  model: \(d.replacingOccurrences(of: "\n", with: " | "))") }
+      }
+      lines.append("")
+    }
+    return lines.joined(separator: "\n")
   }
 
   static func markdown(_ reports: [EvalReport]) -> String {
