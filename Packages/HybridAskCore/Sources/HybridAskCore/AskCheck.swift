@@ -12,24 +12,32 @@ public enum AskCheck {
 
     // The model saw the note with the name replaced, so check against that same text.
     let seen = AskPrompt.redact(note.text, name: child.name)
-    guard canSupportATip(seen) else { return .floor(.noSupportingNote) }
+    guard canSupportATip(seen), let part = decidingPart(seen) else { return .floor(.noSupportingNote) }
 
-    // 1. The object must be the note's own words. We show the note's text, not the model's.
-    guard let found = locate(draft.object, in: seen) else { return .floor(.noSupportingNote) }
+    // 1. The object must be the note's own words, from the part of the note that
+    //    decides. We show the note's text, not the model's.
+    guard let found = locate(draft.object, in: part) else { return .floor(.noSupportingNote) }
 
-    // 2. How did that day go? Only the note's own wording decides. A note that
-    //    doesn't say ("Long nap after the park") is no evidence of a better day,
-    //    whatever the model thinks. A model that disagrees with the note is refused.
-    let day = dayFromWording(seen)
-    guard day != .unclear, draft.dayWas == day || draft.dayWas == .unclear else {
-      return .floor(.noSupportingNote)
+    // 2. How did that day go? Only the note's own wording decides, and a model that
+    //    disagrees with the note is refused. A note that names no better or worse
+    //    ("Said 'ball' when we played catch") can only back trying the same thing
+    //    again, and the tip doesn't claim the day went better.
+    let day: DayWas
+    let stated: Bool
+    switch reading(part) {
+    case .better: (day, stated) = (.better, true)
+    case .worse: (day, stated) = (.worse, true)
+    case .silent: (day, stated) = (.better, false)
+    case .mixed: return .floor(.noSupportingNote)
     }
+    guard draft.dayWas == day || draft.dayWas == .unclear else { return .floor(.noSupportingNote) }
+    if !stated && found.leftOut { return .floor(.noSupportingNote) }
 
     // 3. The app decides the direction from the note itself.
     guard let action = action(day: day, leftOut: found.leftOut) else { return .floor(.noSupportingNote) }
 
     // 4. The app writes the sentence.
-    let tip = TipText.compose(action: action, object: found.span)
+    let tip = TipText.compose(action: action, object: found.span, dayStated: stated)
     if mentionsMedical(tip) { return .floor(.medicalTopic) }
     return .tip(text: tip, basedOn: note)
   }
@@ -51,11 +59,29 @@ public enum AskCheck {
                                        "skipped", "skip", "skipping", "missed", "stopped", "dropped", "forgot",
                                        "until", "before", "if"]
 
-  /// A note can only support a tip if it says how the day went AND links that to
-  /// something done or left out. "Up at 5:10 again, happy and chatty" says neither,
-  /// so the model never sees it as a choice: fewer wrong picks, and nothing lost.
+  /// "Loved the crinkly book": liking something is its own link to it.
+  static let preferenceWords: Set<String> = ["loved", "loves", "enjoyed", "enjoys", "liked", "likes"]
+
+  /// A note can support a tip if the part of it that decides (see `decidingPart`)
+  /// links something done or left out to how things went. "Up at 5:10 again,
+  /// happy and chatty" links nothing, so the model never sees it as a choice.
   public static func canSupportATip(_ text: String) -> Bool {
-    dayFromWording(text) != .unclear && tokens(text).contains(where: linkWords.contains)
+    guard let part = decidingPart(text) else { return false }
+    return tokens(part).contains { linkWords.contains($0) || preferenceWords.contains($0) }
+  }
+
+  /// The part of a note that says how things went. Usually the whole note. A
+  /// note with better and worse words together counts only if it turns with
+  /// "but", and then only the part after it counts: "Grumpy after school but happy
+  /// again after a snack" is about the snack, not school. Otherwise mixed notes
+  /// can't back a tip.
+  public static func decidingPart(_ text: String) -> String? {
+    guard reading(text) == .mixed else { return text }
+    guard let turn = text.range(of: #"\bbut\b"#, options: [.regularExpression, .caseInsensitive, .backwards]) else {
+      return nil
+    }
+    let after = text[turn.upperBound...].trimmingCharacters(in: .whitespaces)
+    return reading(after) == .better || reading(after) == .worse ? after : nil
   }
 
   // MARK: - Finding the object in the note
@@ -102,6 +128,11 @@ public enum AskCheck {
 
     var firstWord = noteTokens[best.first].word
     let lastWord = noteTokens[best.last].word
+    // "after the park": the thing is the park, not the word that links it.
+    while firstWord < lastWord, tokens(original[firstWord]).allSatisfy(linkWords.contains),
+          !tokens(original[firstWord]).contains(where: leftOutWords.contains) {
+      firstWord += 1
+    }
     // "the day we skipped the late snack": the thing is what comes after "skipped".
     var leftOutInside = false
     if let cut = (firstWord...lastWord).last(where: { w in tokens(original[w]).contains(where: leftOutWords.contains) }),
@@ -127,8 +158,9 @@ public enum AskCheck {
                                         "grumpy", "upset", "woke", "refused", "pushed", "hard", "harder",
                                         "fight", "screamed", "worse", "shorter", "clingy", "tears"]
 
-  /// `.better` / `.worse` only when the wording points one way; mixed or silent notes are `.unclear`.
-  public static func dayFromWording(_ text: String) -> DayWas {
+  enum Reading { case better, worse, silent, mixed }
+
+  static func reading(_ text: String) -> Reading {
     var padded = " " + normalized(text) + " "
     var better = 0
     for phrase in betterPhrases where padded.contains(" \(phrase) ") {
@@ -138,9 +170,21 @@ public enum AskCheck {
     let words = padded.split(separator: " ").map(String.init)
     better += words.filter(betterWords.contains).count
     let worse = words.filter(worseWords.contains).count
-    if better > 0 && worse == 0 { return .better }
-    if worse > 0 && better == 0 { return .worse }
-    return .unclear
+    switch (better > 0, worse > 0) {
+    case (true, false): return .better
+    case (false, true): return .worse
+    case (false, false): return .silent
+    case (true, true): return .mixed
+    }
+  }
+
+  /// `.better` / `.worse` only when the wording points one way; mixed or silent notes are `.unclear`.
+  public static func dayFromWording(_ text: String) -> DayWas {
+    switch reading(text) {
+    case .better: .better
+    case .worse: .worse
+    case .silent, .mixed: .unclear
+    }
   }
 
   // MARK: - Medical wording
@@ -178,9 +222,16 @@ public enum TipText {
   static let determiners: Set<String> = ["the", "a", "an", "her", "his", "their", "our", "some", "two",
                                          "three", "same", "that", "this"]
 
-  public static func compose(action: TipAction, object: String) -> String {
+  /// `dayStated` is false when the note doesn't say the day went better or worse,
+  /// only what happened alongside: the tip then doesn't claim a better day.
+  public static func compose(action: TipAction, object: String, dayStated: Bool = true) -> String {
     let first = object.split(separator: " ").first.map { $0.lowercased() } ?? ""
     let reads = determiners.contains(first) || first.first?.isNumber == true
+    if !dayStated {
+      return reads
+        ? "Try \(object) again this week. Your note ties it to what happened that day."
+        : "Try this again this week: “\(object)”. Your note ties it to what happened that day."
+    }
     switch action {
     case .repeatIt:
       return reads

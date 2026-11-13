@@ -8,7 +8,7 @@ private func daysAgo(_ d: Int) -> Date { now.addingTimeInterval(-Double(d) * 86_
 private let mia = AskChild(name: "Mia", ageMonths: 14)
 private let notes = [
   AskNote(text: "Up at 5:10 again, happy and chatty in the cot.", category: "sleep", createdAt: daysAgo(2)),
-  AskNote(text: "Long nap 12–2:30 after the park.", category: "routine", createdAt: daysAgo(4)),
+  AskNote(text: "Long nap 12–2:30 today.", category: "routine", createdAt: daysAgo(4)),
   AskNote(text: "Slept to 6:40 on the day we skipped the late snack.", category: "sleep", createdAt: daysAgo(6)),
 ]
 
@@ -157,10 +157,8 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   // The note says better; a model claiming worse would flip the advice.
   #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .worse), notes: ids, child: mia)
     == .floor(.noSupportingNote))
-  // Note silent: nothing to go on, even when the model calls it a better day (seen on device).
-  #expect(AskCheck.review(AskDraft(noteId: "n2", object: "after the park", dayWas: .unclear), notes: ids, child: mia)
-    == .floor(.noSupportingNote))
-  #expect(AskCheck.review(AskDraft(noteId: "n2", object: "Long nap 12–2:30 after the park", dayWas: .better),
+  // Note silent and links nothing: nothing to go on, even when the model calls it a better day.
+  #expect(AskCheck.review(AskDraft(noteId: "n2", object: "Long nap 12–2:30 today", dayWas: .better),
                           notes: ids, child: mia) == .floor(.noSupportingNote))
   // Model unsure, note clear: the note decides.
   #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .unclear), notes: ids, child: mia)
@@ -410,7 +408,8 @@ private final class FixedDraft: AskModel, @unchecked Sendable {
     "Pointed at the dog and said “da” three times.",
   ]
   let notes = texts.enumerated().map { i, t in AskNote(text: t, createdAt: now.addingTimeInterval(-Double(i + 1) * 86_400)) }
-  #expect(texts.filter(AskCheck.canSupportATip).count == 4)
+  // The park note says nothing better or worse, but links the nap to the park.
+  #expect(texts.filter(AskCheck.canSupportATip).count == 5)
 
   func ask(_ q: String, pick text: String, object: String) async -> AskOutcome {
     let numbered = AskPrompt.number(AskRetrieval.select(notes.filter { AskCheck.canSupportATip($0.text) }, question: q),
@@ -426,4 +425,51 @@ private final class FixedDraft: AskModel, @unchecked Sendable {
   if case let .tip(text, _) = dark { #expect(text.hasPrefix("Try the room dark and the white noise on again")) } else { Issue.record("\(dark)") }
   let lunch = await ask("How can I get her to eat lunch?", pick: texts[5], object: "sat at the table with us")
   if case let .tip(text, _) = lunch { #expect(text.contains("sat at the table with us")) } else { Issue.record("\(lunch)") }
+}
+
+// MARK: - Notes that turn, like, or only say what happened (dev cases h02, h21, h27)
+
+private func reviewOne(_ text: String, object: String, dayWas: DayWas = .unclear, name: String = "Mia") -> AskOutcome {
+  let note = AskNote(text: text, createdAt: now)
+  return AskCheck.review(AskDraft(noteId: "n1", object: object, dayWas: dayWas), notes: ["n1": note],
+                         child: AskChild(name: name, ageMonths: 20))
+}
+
+private func tipText(_ outcome: AskOutcome) -> String? {
+  if case let .tip(text, _) = outcome { return text }
+  return nil
+}
+
+@Test func aNoteThatTurnsWithButCountsFromTheTurn() {
+  let note = "Grumpy after school but happy again after a snack and 20 minutes outside."
+  #expect(AskCheck.canSupportATip(note))
+  #expect(AskCheck.decidingPart(note) == "happy again after a snack and 20 minutes outside.")
+  #expect(tipText(reviewOne(note, object: "a snack and 20 minutes outside"))
+    == "Try a snack and 20 minutes outside again this week. It's what was different on the better day in your note.")
+  // The part before the turn is not what helped.
+  #expect(reviewOne(note, object: "after school") == .floor(.noSupportingNote))
+  // Mixed with no turn: still unclear.
+  #expect(!AskCheck.canSupportATip("Cried at drop-off, settled after a cuddle."))
+  #expect(!AskCheck.canSupportATip("Settled quickly but woke at 2."))
+}
+
+@Test func likingSomethingLinksToIt() {
+  let note = "Loved the crinkly book, kept grabbing the pages."
+  #expect(AskCheck.canSupportATip(note))
+  #expect(tipText(reviewOne(note, object: "the crinkly book"))
+    == "Try the crinkly book again this week. It's what was different on the better day in your note.")
+}
+
+@Test func aNoteThatOnlySaysWhatHappenedGetsAPlainerTip() {
+  let note = "Said 'ball' three times when we played catch."
+  #expect(AskCheck.canSupportATip(note))
+  #expect(tipText(reviewOne(note, object: "when we played catch"))
+    == "Try this again this week: “we played catch”. Your note ties it to what happened that day.")
+  #expect(tipText(reviewOne("Long nap 12–2:30 after the park.", object: "after the park"))
+    == "Try the park again this week. Your note ties it to what happened that day.")
+  // No better or worse in the note: leaving something out isn't backed, and a model calling it worse is refused.
+  #expect(reviewOne("Long nap on the day we skipped the snack.", object: "the snack") == .floor(.noSupportingNote))
+  #expect(reviewOne(note, object: "we played catch", dayWas: .worse) == .floor(.noSupportingNote))
+  // Still nothing linked: no tip.
+  #expect(!AskCheck.canSupportATip("Pointed at the dog and said “da” three times."))
 }

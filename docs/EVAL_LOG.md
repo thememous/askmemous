@@ -37,3 +37,26 @@ These parts of the pipeline are deterministic, so they were measured at once:
 
 These misses stay unfixed until the phone runs on n01–n31 are recorded. Any
 fix after that is listed below as made after seeing held-out results.
+
+## 2026-11-13 · Note filter widened (developed on dev cases only)
+
+Changes, all in `AskCheck`:
+
+- **Notes that turn with "but".** A note with better and worse words together
+  now counts if it turns with "but". Only the part after the turn decides the
+  day, and the copied words must come from that part. Mixed notes with no "but"
+  still can't back a tip.
+- **Liking something links to it.** "loved / enjoyed / liked X" counts as a link
+  to X.
+- **Notes that only say what happened.** A note with no better or worse words
+  but a link word ("Said 'ball' when we played catch") can back trying the same
+  thing again. The tip says "Your note ties it to what happened that day", not
+  "the better day". Leaving something out is not backed by such a note.
+- A leading link word is trimmed from the copied words, so the tip reads "the
+  park", not "after the park".
+- The prompt line that tells the model what every note contains now matches.
+
+Checked against dev cases only. h02, h21 and h27 now reach a model. More
+distractor notes now reach the model too (h20 went from 3 to 6 of its 8 notes),
+so the phone runs will show whether picking got harder. The n01–n31 results
+were not looked at case by case before this change was committed.
