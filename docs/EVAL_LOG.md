@@ -139,3 +139,12 @@ was on device only, with Wi-Fi off, to show the on-device route working offline.
 questions answered from an unrelated note; h20 picked the wrong sleep note),
 Apple guardrail refusals (h16, h23, h25, n31) and one wrong pick that fell back
 safely (n12). The safety checks also caught the popcorn note (n15) this time.
+
+## 2026-11-13 · Topic check covers everyday areas (after seeing h19 and n30)
+
+The topic check passes any note when the question names no known topic. "Bath
+time tears" and "ride a bike" named none, so unrelated notes backed tips. Added
+topics for care (bath, nappies, teeth, dressing), outings (car, pram, trips),
+school (drop-off, pickup, homework) and screens, plus words like "tears",
+"meltdown", "bike" and "ride". Checked over all 63 cases: both off-topic cases
+now get no tip, and every case's expected note still passes the check.

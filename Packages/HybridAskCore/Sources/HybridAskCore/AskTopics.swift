@@ -3,7 +3,7 @@ import Foundation
 /// Plain-word topics, used to check that a chosen note is about the question.
 /// Deliberately simple and readable: a parent-facing rule, not a classifier.
 public enum AskTopic: String, Sendable, CaseIterable {
-  case sleep, food, play, curiosity, feelings, talking, moving
+  case sleep, food, play, curiosity, feelings, talking, moving, care, outings, school, screens
 
   /// Word starts that mark each topic (matched against word prefixes).
   static let stems: [AskTopic: [String]] = [
@@ -11,12 +11,20 @@ public enum AskTopic: String, Sendable, CaseIterable {
              "tired", "drows", "settl", "rest", "5am", "6am", "early"],
     .food: ["eat", "ate", "food", "snack", "meal", "milk", "feed", "bottle", "breakfast",
             "lunch", "dinner", "hungry", "fruit", "veg", "drink"],
-    .play: ["play", "park", "toy", "game", "block", "puzzle", "ball", "swing", "slide"],
+    .play: ["play", "park", "toy", "game", "block", "puzzle", "ball", "swing", "slide", "shar", "den"],
     .curiosity: ["curious", "curiosity", "explor", "wonder", "question", "why", "notic", "discover"],
     .feelings: ["cry", "cried", "tantrum", "upset", "happy", "calm", "angry", "scared", "clingy",
-                "frustrat", "sad", "laugh", "giggl", "chatty", "fuss"],
-    .talking: ["word", "talk", "say", "said", "babbl", "sing", "sang", "speak", "chat"],
-    .moving: ["walk", "crawl", "climb", "run", "stand", "jump", "step", "roll"],
+                "frustrat", "sad", "laugh", "giggl", "chatty", "fuss", "tear", "scream", "meltdown",
+                "melted", "grump", "cross", "cheer", "fight", "argu", "bit", "bite", "hit"],
+    .talking: ["word", "talk", "say", "said", "babbl", "sing", "sang", "song", "speak", "chat"],
+    .moving: ["walk", "crawl", "climb", "run", "stand", "jump", "step", "roll", "bike", "cycl", "ride",
+              "scoot", "swim", "kick", "throw", "catch"],
+    // Added 2026-11-13: questions about these matched no topic, so any note passed (h19, n30).
+    .care: ["bath", "nappy", "nappies", "diaper", "potty", "toilet", "teeth", "tooth", "brush",
+            "dress", "cloth", "hair", "nail", "wash"],
+    .outings: ["car", "pram", "buggy", "stroller", "pushchair", "trip", "drive", "shop", "journey"],
+    .school: ["school", "homework", "teacher", "class", "nursery", "daycare", "drop", "pickup"],
+    .screens: ["screen", "tablet", "tv", "telly", "phone", "ipad", "video", "cartoon"],
   ]
 
   /// Topics found in a piece of text (and, for notes, their category).

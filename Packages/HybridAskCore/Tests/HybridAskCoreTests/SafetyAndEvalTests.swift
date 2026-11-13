@@ -123,3 +123,16 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
   #expect(AskSafety.gate(question: "He doesn't talk much yet, is that ok?") == .health)
   #expect(AskSafety.unsafePhrase(inTip: "Try keeping his puffy coat on again this week.", ageMonths: 18) != nil)
 }
+
+// Off-topic questions used to pass because they named no known topic (h19, n30).
+@Test func everydayTopicsAreRecognisedSoOffTopicNotesAreRefused() {
+  let peas = AskNote(text: "Ate all her peas when they were on the blue plate.", category: "food", createdAt: Date())
+  let songs = AskNote(text: "Settled quickly when we did the same three songs.", category: "sleep", createdAt: Date())
+  #expect(!AskCheck.isRelevant(question: "How do I help with bath time tears?", note: peas))
+  #expect(!AskCheck.isRelevant(question: "How do I teach him to ride a bike?", note: songs))
+  // Same topic still passes.
+  let car = AskNote(text: "Calmer in the car with the window shade up.", category: "routine", createdAt: Date())
+  #expect(AskCheck.isRelevant(question: "Car trips are hard. What could I try?", note: car))
+  let tv = AskNote(text: "Calm when we gave a five minute warning before the TV went off.", createdAt: Date())
+  #expect(AskCheck.isRelevant(question: "Turning off screens is a battle.", note: tv))
+}
