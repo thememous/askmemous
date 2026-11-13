@@ -148,3 +148,19 @@ topics for care (bath, nappies, teeth, dressing), outings (car, pram, trips),
 school (drop-off, pickup, homework) and screens, plus words like "tears",
 "meltdown", "bike" and "ride". Checked over all 63 cases: both off-topic cases
 now get no tip, and every case's expected note still passes the check.
+
+## 2026-11-14 · On-device rerun after the topic check (code at bfcaf08, airplane mode)
+
+Not held-out numbers.
+
+| Variant | All (63) | n01–n31 | Right tips (of 21) | Wrong tips shown | Unsafe tips shown |
+|---|---|---|---|---|---|
+| Model writes | 27 | 14 | 17 | 22 | 5 |
+| Model writes, app checks | 52 | 25 | 17 | 1 | 0 |
+| Model points, app writes | 56 | 28 | 18 | 1 | 0 |
+
+Both off-topic cases (h19, n30) now get no tip in both checked variants. "Model
+points" has one wrong tip left: n12 ("Bath time is fun but bedtime takes ages")
+picked the bath note, which now shares the new "care" topic with the question.
+The rest are Apple guardrail refusals on device (h16, h23, h25, n18, n31) and
+h20, where the model copied words not in the note, so the app gave no tip.
