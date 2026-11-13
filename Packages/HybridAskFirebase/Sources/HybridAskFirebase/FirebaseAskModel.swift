@@ -19,8 +19,18 @@ struct TipDraft {
   var object: String
 }
 
+/// The eval's "before": the model writes the tip itself (MemoUS Ask's approach).
+@Generable
+struct FreeTip {
+  @Guide(description: "The id of the note your tip is tied to, such as n2, or none if the notes do not support a tip.")
+  var noteId: String
+
+  @Guide(description: "Your answer to the parent, in plain text.")
+  var tip: String
+}
+
 /// `AskModel` backed by Firebase AI Logic hybrid inference.
-public struct FirebaseAskModel: AskModel {
+public struct FirebaseAskModel: AskModel, FreeTextAskModel {
   /// A "billing not required" model on the Firebase AI Logic models list.
   public static let defaultCloudModel = "gemini-3.5-flash-lite"
 
@@ -32,11 +42,32 @@ public struct FirebaseAskModel: AskModel {
 
   public func draft(instructions: String, prompt: String, route: AskRoute) async throws
     -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    let response = try await session(instructions: instructions, route: route)
+      .respond(to: prompt, generating: TipDraft.self)
+    let version = response.rawResponse.modelVersion
+    return (
+      // The app reads better/worse from the note itself; on device the model got it backwards.
+      AskDraft(noteId: response.content.noteId, object: response.content.object, dayWas: .unclear),
+      AnswerSource.from(modelVersion: version),
+      version
+    )
+  }
+
+  public func write(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskFreeDraft, source: AnswerSource, modelVersion: String) {
+    let response = try await session(instructions: instructions, route: route)
+      .respond(to: prompt, generating: FreeTip.self)
+    let version = response.rawResponse.modelVersion
+    return (AskFreeDraft(noteId: response.content.noteId, tip: response.content.tip),
+            AnswerSource.from(modelVersion: version), version)
+  }
+
+  /// A new session per question: no chat history carries over between asks.
+  private func session(instructions: String, route: AskRoute) -> GenerativeModelSession {
     let ai = FirebaseAI.firebaseAI(backend: .googleAI())
     let cloud = ai.geminiModel(name: cloudModelName)
     let system = FirebaseAI.SystemLanguageModel.default
-    // A new session per question: no chat history carries over between asks.
-    let session = switch route {
+    return switch route {
     case .hybrid:
       ai.generativeModelSession(model: .hybridModel(primary: system, secondary: cloud), instructions: instructions)
     case .cloudOnly:
@@ -44,14 +75,6 @@ public struct FirebaseAskModel: AskModel {
     case .onDeviceOnly:
       ai.generativeModelSession(model: system, instructions: instructions)
     }
-    let response = try await session.respond(to: prompt, generating: TipDraft.self)
-    let version = response.rawResponse.modelVersion ?? ""
-    return (
-      // The app reads better/worse from the note itself; on device the model got it backwards.
-      AskDraft(noteId: response.content.noteId, object: response.content.object, dayWas: .unclear),
-      AnswerSource.from(modelVersion: version),
-      version
-    )
   }
 }
 

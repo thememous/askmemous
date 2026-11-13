@@ -43,6 +43,12 @@ struct SettingsView: View {
           Text("Hybrid is the normal mode. Cloud only still needs cloud checks to be allowed.")
         }
 
+        Section {
+          NavigationLink("Eval runner") { EvalView() }
+        } footer: {
+          Text("Runs the fictional test cases through each way of answering and compares the numbers.")
+        }
+
         #if DEBUG
         Section("App Check (debug)") {
           Button("Get App Check token") { Task { await fetchAppCheckToken() } }
