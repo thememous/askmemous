@@ -88,13 +88,18 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
     return timed.isEmpty ? 0 : timed.map(\.seconds).reduce(0, +) / Double(timed.count)
   }
 
+  /// How many cases failed because the cloud refused for rate limits (the run should be repeated).
+  public var rateLimited: Int {
+    results.filter { ($0.modelDetail ?? "").contains("429") || ($0.modelDetail ?? "").contains("resourceExhausted") }.count
+  }
+
   public static let markdownHeader = """
   | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | On device / cloud / app | Avg model s |
   |---|---|---|---|---|---|---|---|---|
   """
 
   public var markdownRow: String {
-    let partial = complete ? "" : " (stopped)"
+    let partial = (complete ? "" : " (stopped)") + (rateLimited > 0 ? " (\(rateLimited) rate-limited)" : "")
     let tips = hasTipCounts ? "\(rightTips)/\(tipCases) | \(wrongTips)" : "– | –"
     let timing = isReference == true ? "– | –" : "\(onDevice) / \(cloud) / \(appOnly) | \(String(format: "%.1f", meanModelSeconds))"
     return "| \(variant.title) | \(routeTitle)\(partial) | \(passed)/\(total) | \(heldoutPassed)/\(heldoutTotal) | "
@@ -126,24 +131,34 @@ public struct EvalRunner: Sendable {
   }
 
   /// Stops early (complete = false) if the task is cancelled.
+  /// - Parameter pace: the least time between two model calls. The cloud's free tier
+  ///   allows 15 requests a minute; a run faster than that fails on rate limits, not answers.
   public func run(
     _ cases: [EvalCase],
     variant: AskVariant,
     route: AskRoute,
     cloudAllowed: Bool,
     now: Date = Date(),
+    pace: Duration = .zero,
     progress: @Sendable (Int, Int) async -> Void = { _, _ in }
   ) async -> EvalReport {
     var results: [EvalCaseResult] = []
     let clock = ContinuousClock()
+    var lastModelCall: ContinuousClock.Instant?
     for (index, c) in cases.enumerated() {
       if Task.isCancelled { break }
       await progress(index, cases.count)
+      if let lastModelCall, pace > .zero {
+        let wait = pace - (clock.now - lastModelCall)
+        if wait > .zero { try? await Task.sleep(for: wait) }
+        if Task.isCancelled { break }
+      }
       let built = c.askNotes(now: now)
       let start = clock.now
       let answer = await answer(c, notes: built.notes, variant: variant, route: route,
                                 cloudAllowed: cloudAllowed, now: now)
       let elapsed = clock.now - start
+      if answer.source != .app || answer.detail != nil { lastModelCall = clock.now }
       let graded = c.grade(answer, caseIdFor: built.caseIdFor)
       let shown: String, gaveTip: Bool
       switch answer.outcome {

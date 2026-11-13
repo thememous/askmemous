@@ -91,6 +91,9 @@ struct EvalView: View {
 
   private var runFooter: String {
     var lines = ["Cases are fictional. They run one at a time; the on-device model takes a few seconds each."]
+    if route != .onDeviceOnly {
+      lines.append("Cloud runs wait about 4.5 s between model calls to stay under the free tier's 15 requests a minute.")
+    }
     if route != .onDeviceOnly && !cloudAllowed {
       lines.append("Cloud checks are off, so cloud cases will show the “cloud checks are off” reply. Turn them on in Settings first.")
     }
@@ -116,7 +119,9 @@ struct EvalView: View {
     progress = (0, cases.count)
     UIApplication.shared.isIdleTimerDisabled = true
     running = Task {
-      let report = await runner.run(cases, variant: variant, route: route, cloudAllowed: allowed) { done, total in
+      // Stay under the cloud free tier's 15 requests a minute.
+      let pace: Duration = route == .onDeviceOnly ? .zero : .milliseconds(4_500)
+      let report = await runner.run(cases, variant: variant, route: route, cloudAllowed: allowed, pace: pace) { done, total in
         await MainActor.run { progress = (done, total) }
       }
       reports.removeAll { $0.id == report.id }
@@ -140,6 +145,9 @@ private struct ReportRow: View {
       }
       Text("Passed \(report.passed)/\(report.total) · held-out \(report.heldoutPassed)/\(report.heldoutTotal) · unsafe \(report.unsafe)")
         .monospacedDigit()
+      if report.rateLimited > 0 {
+        Text("\(report.rateLimited) cases hit the cloud rate limit. Run again.").font(.caption).foregroundStyle(.orange)
+      }
       if report.hasTipCounts {
         Text("Right tips \(report.rightTips)/\(report.tipCases) · wrong tips shown \(report.wrongTips)")
           .monospacedDigit()

@@ -102,3 +102,16 @@ private struct EagerWriter: FreeTextAskModel {
     #expect(report.results.first?.shown == "[cloudNotAllowed]", "\(variant)")
   }
 }
+
+@Test func cloudRunsArePacedBetweenModelCalls() async throws {
+  let cases = try EvalSet.bundled().cases.filter { ["dev-sleep-snack", "h22-preschool-sharing", "h24-no-birthdate"].contains($0.id) }
+  #expect(cases.count == 3)
+  let runner = EvalRunner(pointer: FirstNotePointer(), writer: EagerWriter(tip: "Try that again."))
+  let clock = ContinuousClock()
+  let start = clock.now
+  let report = await runner.run(cases, variant: .modelWrites, route: .onDeviceOnly, cloudAllowed: false,
+                                pace: .milliseconds(150))
+  #expect(report.complete)
+  #expect(clock.now - start >= .milliseconds(300))
+  #expect(report.rateLimited == 0)
+}

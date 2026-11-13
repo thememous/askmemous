@@ -42,7 +42,12 @@ public struct FirebaseAskModel: AskModel, FreeTextAskModel {
 
   public func draft(instructions: String, prompt: String, route: AskRoute) async throws
     -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
-    let response = try await session(instructions: instructions, route: route)
+    // Pointing only copies words from the parent's own notes, and the app writes and
+    // checks everything shown, so this is the "content transformation" case Apple's
+    // permissive guardrails are for. With the default ones, ordinary notes about sleep
+    // or goodbyes were often refused on device. The app's own safety checks still run.
+    let response = try await session(instructions: instructions, route: route,
+                                     guardrails: .permissiveContentTransformations)
       .respond(to: prompt, generating: TipDraft.self)
     let version = response.rawResponse.modelVersion
     return (
@@ -55,7 +60,8 @@ public struct FirebaseAskModel: AskModel, FreeTextAskModel {
 
   public func write(instructions: String, prompt: String, route: AskRoute) async throws
     -> (draft: AskFreeDraft, source: AnswerSource, modelVersion: String) {
-    let response = try await session(instructions: instructions, route: route)
+    // Free writing creates new advice, so it keeps Apple's default guardrails.
+    let response = try await session(instructions: instructions, route: route, guardrails: .default)
       .respond(to: prompt, generating: FreeTip.self)
     let version = response.rawResponse.modelVersion
     return (AskFreeDraft(noteId: response.content.noteId, tip: response.content.tip),
@@ -63,10 +69,11 @@ public struct FirebaseAskModel: AskModel, FreeTextAskModel {
   }
 
   /// A new session per question: no chat history carries over between asks.
-  private func session(instructions: String, route: AskRoute) -> GenerativeModelSession {
+  private func session(instructions: String, route: AskRoute,
+                       guardrails: FirebaseAI.SystemLanguageModel.Guardrails) -> GenerativeModelSession {
     let ai = FirebaseAI.firebaseAI(backend: .googleAI())
     let cloud = ai.geminiModel(name: cloudModelName)
-    let system = FirebaseAI.SystemLanguageModel.default
+    let system = FirebaseAI.SystemLanguageModel(useCase: .general, guardrails: guardrails)
     return switch route {
     case .hybrid:
       ai.generativeModelSession(model: .hybridModel(primary: system, secondary: cloud), instructions: instructions)
