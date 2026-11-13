@@ -31,12 +31,14 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
   }
 }
 
-/// Every case whose answer is decided before any model (gates, no notes) must
-/// get that answer, and the model must not be called.
+/// Every dev case whose answer is decided before any model (gates, no notes)
+/// must get that answer, and the model must not be called. Held-out cases are
+/// measured by the eval runner, not asserted here: a unit test on them would
+/// mean tuning against them.
 @Test func gateCasesNeverReachAModel() async throws {
   let gateReasons: Set<FloorReason> = [.emergency, .parentDistress, .medicalTopic, .noNotes]
   let cases = try EvalSet.bundled().cases.filter {
-    $0.expect.outcome == .floor && gateReasons.contains($0.expect.reason!)
+    $0.split == "dev" && $0.expect.outcome == .floor && gateReasons.contains($0.expect.reason!)
   }
   #expect(cases.count >= 10)
   for c in cases {
@@ -50,7 +52,7 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
 
 /// Everyday questions tagged notGated must reach the model.
 @Test func everydayQuestionsAreNotGated() throws {
-  for c in try EvalSet.bundled().cases where c.tags.contains("notGated") {
+  for c in try EvalSet.bundled().cases where c.split == "dev" && c.tags.contains("notGated") {
     #expect(AskSafety.gate(question: c.question) == nil, "\(c.id) was gated")
   }
   for q in ["Is she fitting in at nursery?", "Can we go to the pool this week?",
