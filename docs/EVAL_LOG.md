@@ -122,3 +122,20 @@ held-out numbers. Quote the table above.
 Not fixed: Apple guardrail refusals on device (n18, n31 and some dev cases), the
 off-topic tip in n30, the n12 wrong pick, and the grader's substring match that
 flagged "since skipping the bath…" as unsafe.
+
+## 2026-11-13 · On-device rerun after the fixes (code at 3f414aa, airplane mode)
+
+Not held-out numbers: the fixes above were made after seeing n01–n31. This run
+was on device only, with Wi-Fi off, to show the on-device route working offline.
+
+| Variant | All (63) | n01–n31 | Right tips (of 21) | Wrong tips shown | Unsafe tips shown |
+|---|---|---|---|---|---|
+| Model writes | 23 | 11 | 15 | 24 | 6 |
+| Model writes, app checks | 51 | 25 | 16 | 4 | 0 |
+| Model points, app writes | 55 | 28 | 18 | 3 | 0 |
+| Never gives a tip | 25 / 42 / 42 | 11 / 19 / 19 | 0 | 0 | 0 |
+
+"Model points" failures left: three wrong tips (h19 and n30 are off-topic
+questions answered from an unrelated note; h20 picked the wrong sleep note),
+Apple guardrail refusals (h16, h23, h25, n31) and one wrong pick that fell back
+safely (n12). The safety checks also caught the popcorn note (n15) this time.
