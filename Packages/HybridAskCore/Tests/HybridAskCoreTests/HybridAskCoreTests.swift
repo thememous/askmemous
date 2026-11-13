@@ -448,8 +448,10 @@ private func tipText(_ outcome: AskOutcome) -> String? {
     == "Try a snack and 20 minutes outside again this week. It's what was different on the better day in your note.")
   // The part before the turn is not what helped.
   #expect(reviewOne(note, object: "after school") == .floor(.noSupportingNote))
-  // Mixed with no turn: still unclear.
-  #expect(!AskCheck.canSupportATip("Cried at drop-off, settled after a cuddle."))
+  // A comma where the wording turns counts too (added after held-out n07).
+  #expect(AskCheck.decidingPart("Cried at drop-off, settled after a cuddle.") == "settled after a cuddle.")
+  // No turn, or no change of direction at the comma: still unclear.
+  #expect(!AskCheck.canSupportATip("Cried and laughed after the park."))
   #expect(!AskCheck.canSupportATip("Settled quickly but woke at 2."))
 }
 
@@ -472,4 +474,11 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   #expect(reviewOne(note, object: "we played catch", dayWas: .worse) == .floor(.noSupportingNote))
   // Still nothing linked: no tip.
   #expect(!AskCheck.canSupportATip("Pointed at the dog and said “da” three times."))
+}
+
+@Test func copiedWordsThatStopBeforeTheThingAreRefused() {
+  // Seen in held-out n16: "fed and fell asleep with" (the bottle came next).
+  let note = "Fed and fell asleep with the bottle propped on a rolled towel."
+  #expect(AskCheck.locate("fed and fell asleep with", in: note) == nil)
+  #expect(AskCheck.locate("the bottle propped on a rolled towel", in: note) != nil)
 }

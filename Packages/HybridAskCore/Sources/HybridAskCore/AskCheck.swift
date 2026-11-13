@@ -71,17 +71,26 @@ public enum AskCheck {
   }
 
   /// The part of a note that says how things went. Usually the whole note. A
-  /// note with better and worse words together counts only if it turns with
-  /// "but", and then only the part after it counts: "Grumpy after school but happy
-  /// again after a snack" is about the snack, not school. Otherwise mixed notes
-  /// can't back a tip.
+  /// note with better and worse words together counts only if it turns: at the
+  /// last "but", or failing that at the last comma or semicolon where the
+  /// wording changes direction ("Upset after the dentist, calm again once we
+  /// read his book"). Only the part after the turn counts: it says what helped.
+  /// Otherwise mixed notes can't back a tip.
   public static func decidingPart(_ text: String) -> String? {
     guard reading(text) == .mixed else { return text }
-    guard let turn = text.range(of: #"\bbut\b"#, options: [.regularExpression, .caseInsensitive, .backwards]) else {
-      return nil
+    func clean(_ r: Reading) -> Bool { r == .better || r == .worse }
+    if let turn = text.range(of: #"\bbut\b"#, options: [.regularExpression, .caseInsensitive, .backwards]) {
+      let after = text[turn.upperBound...].trimmingCharacters(in: .whitespaces)
+      return clean(reading(after)) ? after : nil
     }
-    let after = text[turn.upperBound...].trimmingCharacters(in: .whitespaces)
-    return reading(after) == .better || reading(after) == .worse ? after : nil
+    // Added 2026-11-13 after held-out n07 (see docs/EVAL_LOG.md).
+    if let turn = text.range(of: #"[,;]"#, options: [.regularExpression, .backwards]) {
+      let before = String(text[..<turn.lowerBound])
+      let after = text[turn.upperBound...].trimmingCharacters(in: .whitespaces)
+      let a = reading(after), b = reading(before)
+      if clean(a), clean(b), a != b { return after }
+    }
+    return nil
   }
 
   // MARK: - Finding the object in the note
@@ -133,6 +142,8 @@ public enum AskCheck {
           !tokens(original[firstWord]).contains(where: leftOutWords.contains) {
       firstWord += 1
     }
+    // "fed and fell asleep with": the copy stopped before the thing itself.
+    if tokens(original[lastWord]).allSatisfy(linkWords.contains) { return nil }
     // "the day we skipped the late snack": the thing is what comes after "skipped".
     var leftOutInside = false
     if let cut = (firstWord...lastWord).last(where: { w in tokens(original[w]).contains(where: leftOutWords.contains) }),

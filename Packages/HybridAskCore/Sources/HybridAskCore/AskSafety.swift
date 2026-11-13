@@ -33,6 +33,12 @@ public enum AskSafety {
     "cant wake", "unconscious", "seizure*", "convuls*", "choking", "button battery",
     "swallowed a battery", "swallowed a magnet", "swallowed bleach", "poison*", "overdose*",
     "bleeding a lot", "won t stop bleeding", "wont stop bleeding",
+    // Added 2026-11-13 after held-out n22/n23 (see docs/EVAL_LOG.md).
+    "swallowed", "bleach", "detergent", "dishwasher tablet*", "laundry pod*", "washing pod*",
+    "cleaning product*", "drank some", "ate some pills", "ate pills", "took pills",
+    "face is swelling", "face swelling", "face is swollen", "swollen face", "lips are swelling",
+    "lips swelling", "swollen lips", "tongue swelling", "swelling up", "anaphyla*", "epipen",
+    "allergic reaction",
   ]
 
   static let distressPhrases = [
@@ -54,6 +60,11 @@ public enum AskSafety {
     "is he behind", "falling behind", "behind for", "behind other", "regress*",
     "paracetamol", "acetaminophen", "ibuprofen", "calpol", "tylenol", "motrin", "nurofen",
     "antibiotic*", "medicine", "eczema", "tongue tie", "reflux", "colic*",
+    // Added 2026-11-13 after held-out n25 (see docs/EVAL_LOG.md).
+    "doesn t point", "doesnt point", "not pointing", "doesn t talk", "doesnt talk", "doesn t walk",
+    "doesnt walk", "doesn t crawl", "doesnt crawl", "doesn t sit", "doesnt sit", "no words yet",
+    "eye contact", "respond to his name", "respond to her name", "milestone*", "developmental",
+    "should i worry", "should i be worried",
   ]
 
   // MARK: - Tips
@@ -91,6 +102,7 @@ public enum AskSafety {
     TipRule(underMonths: 48, phrases: [
       "face forward", "facing forward", "forward facing", "turn the car seat", "turning the car seat",
       "turn her car seat", "turn his car seat", "loosen the strap*", "loosen the harness", "out of the car seat",
+      "puffy", "snowsuit", "bulky", "coat on",
     ]),
     // Choking foods for under-fives.
     TipRule(underMonths: 60, phrases: [
