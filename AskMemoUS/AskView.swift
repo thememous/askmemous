@@ -81,6 +81,13 @@ struct AskView: View {
 
   private var welcome: some View {
     VStack(alignment: .leading, spacing: 12) {
+      VStack(spacing: 8) {
+        MemoMascot(variant: .mascot, size: 120, float: true)
+        Text("Hi, I'm Memo! Ask me anything about \(child.name).")
+          .font(.headline).multilineTextAlignment(.center)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.bottom, 4)
       Text("Answers come only from your notes. \(statusLine)")
         .font(.subheadline).foregroundStyle(.secondary)
       Text("Try asking").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6)
@@ -101,6 +108,17 @@ struct AskView: View {
         .foregroundStyle(.white)
         .background(Color.accentColor, in: .rect(cornerRadius: 18))
     }
+    HStack(alignment: .top, spacing: 8) {
+      MemoMascot(variant: .avatar, size: 32, float: isWaiting(turn))
+      reply(turn)
+    }
+  }
+
+  private func isWaiting(_ turn: Turn) -> Bool {
+    if case .waiting = turn.reply { true } else { false }
+  }
+
+  @ViewBuilder private func reply(_ turn: Turn) -> some View {
     VStack(alignment: .leading, spacing: 8) {
       switch turn.reply {
       case .waiting:
@@ -116,7 +134,7 @@ struct AskView: View {
     .padding(14)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 18))
-    .padding(.trailing, 24)
+    .padding(.trailing, 8)
   }
 
   private var followUps: some View {
