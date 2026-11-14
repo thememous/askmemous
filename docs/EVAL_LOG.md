@@ -227,3 +227,18 @@ Read with care:
 - n12 passed because the model picked the white-noise note this time. In the
   previous run it picked the bath note and the topic check refused it.
 - One run. The previous cloud run of the same code minus two fixes scored 61.
+
+## 2026-11-14 · Tip wording rewritten (no change to what passes)
+
+Tips quoted the model's copied words back, often the whole note: "Try this
+again this week: 'Settled faster with the room dark and white noise on'". The
+app now finds the cause inside the copied words (after "when", "after",
+"with"…), widens short copies to the note's own lead-in ("sang the animal
+song" → "when we sang the animal song"), turns "we" into "you", and fills a
+fixed sentence: "Your note says things went better with the room dark and white
+noise on. Try that again this week." When there's no clear thing to name, the
+tip says "what you did that day"; the app shows the note under it.
+
+Checked by replaying the model picks recorded in the two latest phone runs
+(cloud at b864b74, on-device at 3f89600) through the new code: every case
+passes or fails exactly as on the phone, and no tip is unsafe.

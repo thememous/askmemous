@@ -128,21 +128,21 @@ private final class FakeModel: AskModel, @unchecked Sendable {
 
 @Test func betterDayWithoutItMeansLeaveItOut() {
   let ids = AskPrompt.number(notes, now: now).ids
-  #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better), notes: ids, child: mia) == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: ids["n3"]!))
+  #expect(AskCheck.review(AskDraft(noteId: "n3", object: "the late snack", dayWas: .better), notes: ids, child: mia) == .tip(text: "Your note says things went better on the day without the late snack. Try leaving it out again this week.", basedOn: ids["n3"]!))
 }
 
 @Test func betterDayWithItMeansRepeatIt() {
   let note = AskNote(text: "Didn't cry at drop-off when we did a quick goodbye wave at the door.", createdAt: daysAgo(1))
   let out = AskCheck.review(AskDraft(noteId: "n1", object: "a quick goodbye wave at the door", dayWas: .better),
                             notes: ["n1": note], child: mia)
-  #expect(out == .tip(text: "Try a quick goodbye wave at the door again this week. It's what was different on the better day in your note.", basedOn: note))
+  #expect(out == .tip(text: "Try a quick goodbye wave at the door again this week. It's in your note from a better day.", basedOn: note))
 }
 
 @Test func worseDayWithoutItMeansKeepIt() {
   let note = AskNote(text: "Fussy all afternoon on the day we skipped the morning nap.", createdAt: daysAgo(1))
   let out = AskCheck.review(AskDraft(noteId: "n1", object: "the morning nap", dayWas: .worse),
                             notes: ["n1": note], child: mia)
-  #expect(out == .tip(text: "Try keeping the morning nap this week. Your note shows the day without it was harder.", basedOn: note))
+  #expect(out == .tip(text: "Your note says the day without the morning nap was harder. Try keeping it in this week.", basedOn: note))
 }
 
 @Test func worseDayWithItHasNothingToRepeat() {
@@ -173,9 +173,17 @@ private final class FakeModel: AskModel, @unchecked Sendable {
     != .floor(.noSupportingNote))
 }
 
-@Test func tipWithoutADeterminerIsQuoted() {
+@Test func tipWordsComeFromTheNotesOwnLeadIn() {
+  // The model copied only "kept the room dark"; the note says "when we kept the room dark".
+  #expect(TipText.compose(action: .repeatIt, object: "kept the room dark",
+                          note: "Went down at 7 without crying when we kept the room dark.")
+    == "Your note says things went better when you kept the room dark. Try that again this week.")
+  // A whole note copied: the cause is what comes after the link.
+  #expect(TipText.compose(action: .repeatIt, object: "Shared her blocks with Sam when we set a timer for turns.")
+    == "Your note says things went better when you set a timer for turns. Try that again this week.")
+  // No clear thing to name: point to the day, which the app shows under the tip.
   #expect(TipText.compose(action: .repeatIt, object: "kept the room dark")
-    == "Try this again this week: “kept the room dark”. It's what was different on the better day in your note.")
+    == "Try doing what you did that day again this week. Your note shows it went better.")
 }
 
 @Test func medicalWordsBecomeTheFixedReply() {
@@ -235,7 +243,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   )
   #expect(model.lastPrompt.contains("n1 [6d ago · sleep] Slept to 6:40"))
   #expect(answer.source == .onDevice)
-  #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
+  #expect(answer.outcome == .tip(text: "Your note says things went better on the day without the late snack. Try leaving it out again this week.", basedOn: notes[2]))
 }
 
 @Test func recordRoundTripsAsJSON() throws {
@@ -306,7 +314,7 @@ private final class FakeModel: AskModel, @unchecked Sendable {
     question: "She keeps waking at 5am.", child: mia, notes: notes, cloudAllowed: true, now: now
   )
   #expect(answer.escalated)
-  #expect(answer.outcome == .tip(text: "Try leaving out the late snack again this week. That's what was different on the better day in your note.", basedOn: notes[2]))
+  #expect(answer.outcome == .tip(text: "Your note says things went better on the day without the late snack. Try leaving it out again this week.", basedOn: notes[2]))
 }
 
 // MARK: - Cloud consent + the child's name
@@ -420,11 +428,11 @@ private final class FixedDraft: AskModel, @unchecked Sendable {
   }
 
   let nap = await ask("Evenings are hard lately. Any ideas?", pick: texts[4], object: "missed the afternoon nap")
-  #expect(nap == .tip(text: "Try keeping the afternoon nap this week. Your note shows the day without it was harder.", basedOn: notes[4]))
+  #expect(nap == .tip(text: "Your note says the day without the afternoon nap was harder. Try keeping it in this week.", basedOn: notes[4]))
   let dark = await ask("How can I get her to settle at bedtime?", pick: texts[3], object: "the room dark and the white noise on")
-  if case let .tip(text, _) = dark { #expect(text.hasPrefix("Try the room dark and the white noise on again")) } else { Issue.record("\(dark)") }
+  if case let .tip(text, _) = dark { #expect(text.hasPrefix("Your note says things went better with the room dark and the white noise on.")) } else { Issue.record("\(dark)") }
   let lunch = await ask("How can I get her to eat lunch?", pick: texts[5], object: "sat at the table with us")
-  if case let .tip(text, _) = lunch { #expect(text.contains("sat at the table with us")) } else { Issue.record("\(lunch)") }
+  if case let .tip(text, _) = lunch { #expect(text.contains("when she sat at the table with you.")) } else { Issue.record("\(lunch)") }
 }
 
 // MARK: - Notes that turn, like, or only say what happened (dev cases h02, h21, h27)
@@ -445,7 +453,7 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   #expect(AskCheck.canSupportATip(note))
   #expect(AskCheck.decidingPart(note) == "happy again after a snack and 20 minutes outside.")
   #expect(tipText(reviewOne(note, object: "a snack and 20 minutes outside"))
-    == "Try a snack and 20 minutes outside again this week. It's what was different on the better day in your note.")
+    == "Your note says things went better after a snack and 20 minutes outside. Try that again this week.")
   // The part before the turn is not what helped.
   #expect(reviewOne(note, object: "after school") == .floor(.noSupportingNote))
   // A comma where the wording turns counts too (added after held-out n07).
@@ -459,16 +467,16 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   let note = "Loved the crinkly book, kept grabbing the pages."
   #expect(AskCheck.canSupportATip(note))
   #expect(tipText(reviewOne(note, object: "the crinkly book"))
-    == "Try the crinkly book again this week. It's what was different on the better day in your note.")
+    == "Your note says your child loved the crinkly book. Try that again this week.")
 }
 
 @Test func aNoteThatOnlySaysWhatHappenedGetsAPlainerTip() {
   let note = "Said 'ball' three times when we played catch."
   #expect(AskCheck.canSupportATip(note))
   #expect(tipText(reviewOne(note, object: "when we played catch"))
-    == "Try this again this week: “we played catch”. Your note ties it to what happened that day.")
+    == "In your note, this happened when you played catch. Try that again this week.")
   #expect(tipText(reviewOne("Long nap 12–2:30 after the park.", object: "after the park"))
-    == "Try the park again this week. Your note ties it to what happened that day.")
+    == "In your note, this happened after the park. Try that again this week.")
   // No better or worse in the note: leaving something out isn't backed, and a model calling it worse is refused.
   #expect(reviewOne("Long nap on the day we skipped the snack.", object: "the snack") == .floor(.noSupportingNote))
   #expect(reviewOne(note, object: "we played catch", dayWas: .worse) == .floor(.noSupportingNote))

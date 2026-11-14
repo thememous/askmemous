@@ -37,7 +37,7 @@ public enum AskCheck {
     guard let action = action(day: day, leftOut: found.leftOut) else { return .floor(.noSupportingNote) }
 
     // 4. The app writes the sentence.
-    let tip = TipText.compose(action: action, object: found.span, dayStated: stated)
+    let tip = TipText.compose(action: action, object: found.span, dayStated: stated, leftOut: found.leftOut, note: part)
     if mentionsMedical(tip) { return .floor(.medicalTopic) }
     return .tip(text: tip, basedOn: note)
   }
@@ -229,33 +229,121 @@ public enum AskCheck {
 }
 
 /// The tip sentences. Written by the app, never by a model.
+///
+/// The model copies words from a note, often the whole note: "Settled faster
+/// with the room dark and white noise on". Repeating that back reads like a
+/// form. So the app finds the cause inside the copied words (what comes after
+/// "when", "after", "with"…), turns "we" into "you", and writes the sentence
+/// around it: "Your note says things went better with the room dark and white
+/// noise on. Try that again this week." When there's no clean cause to name,
+/// the tip says "what you did that day": the note is shown right under it.
 public enum TipText {
-  static let determiners: Set<String> = ["the", "a", "an", "her", "his", "their", "our", "some", "two",
-                                         "three", "same", "that", "this"]
+  static let determiners: Set<String> = ["the", "a", "an", "her", "his", "their", "our", "some", "same",
+                                         "that", "this", "your", "one", "two", "three", "four", "five", "ten"]
+  /// Words that start the cause: "settled when we set a timer", "calmer after the park".
+  static let clauseLinks: Set<String> = ["when", "after", "once", "because", "since", "before", "until", "if"]
+  /// Words that start the cause only at its start: "with the room dark", "at the kitchen table".
+  static let placeLinks: Set<String> = ["with", "at", "in", "on"]
+  static let subjects: Set<String> = ["we", "i", "she", "he", "they", "you", "your"]
+  static let toParent: [String: String] = ["we": "you", "i": "you", "us": "you", "our": "your",
+                                           "my": "your", "me": "you"]
+
+  static func bare(_ w: String) -> String { AskCheck.tokens(w).joined(separator: " ") }
+
+  /// The copied words, widened to the note's own lead-in: "sang the animal song"
+  /// is "when we sang the animal song" in the note; "room dark" is "with the room dark".
+  static func widened(_ span: String, in note: String?) -> String {
+    guard let note, let r = note.range(of: span, options: .caseInsensitive) else { return span }
+    var before = note[..<r.lowerBound].split(whereSeparator: \.isWhitespace).map(String.init)
+    var lead: [String] = []
+    if let w = before.last, !w.hasSuffix(","), !w.hasSuffix(";"), !w.hasSuffix("."),
+       determiners.contains(bare(w)) || subjects.contains(bare(w)) {
+      lead.insert(w, at: 0); before.removeLast()
+    }
+    if let w = before.last, !w.hasSuffix(","), !w.hasSuffix(";"), !w.hasSuffix("."),
+       clauseLinks.contains(bare(w)) || placeLinks.contains(bare(w)) || AskCheck.preferenceWords.contains(bare(w)) {
+      lead.insert(w, at: 0)
+    } else if lead.first.map({ subjects.contains(bare($0)) }) == true {
+      return span // "she sang": no link to the day, leave it as copied
+    }
+    return (lead + [String(note[r])]).joined(separator: " ")
+  }
+
+  enum Cause { case linked(link: String, thing: String), liked(verb: String, thing: String), plain(String) }
+
+  /// The cause named in the copied words. `nil` when the words only say what
+  /// happened ("Slept to 6:40").
+  static func cause(in span: String, leftOut: Bool, note: String?) -> Cause? {
+    var words = (leftOut ? span : widened(span, in: note)).split(whereSeparator: \.isWhitespace).map(String.init)
+    // Stop at the first comma or semicolon: "the crinkly book, kept grabbing the pages".
+    if let cut = words.firstIndex(where: { $0.hasSuffix(",") || $0.hasSuffix(";") }) {
+      words = Array(words[...cut])
+    }
+    func tidy(_ ws: ArraySlice<String>) -> String? {
+      let t = ws.map { w -> String in
+        let core = w.trimmingCharacters(in: .punctuationCharacters)
+        guard let swap = toParent[core.lowercased()] else { return w }
+        return w.replacingOccurrences(of: core, with: swap)
+      }
+      .joined(separator: " ")
+      .trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
+      return t.isEmpty ? nil : t
+    }
+    guard let first = words.first.map(bare) else { return nil }
+    if leftOut { return tidy(words[...]).map(Cause.plain) }
+    if AskCheck.preferenceWords.contains(first) {
+      return tidy(words.dropFirst()).map { .liked(verb: first, thing: $0) }
+    }
+    if clauseLinks.contains(first) || placeLinks.contains(first) {
+      return tidy(words.dropFirst()).map { .linked(link: first, thing: $0) }
+    }
+    if determiners.contains(first) || first.first?.isNumber == true {
+      return tidy(words[...]).map(Cause.plain)
+    }
+    let at0 = words.firstIndex { clauseLinks.contains(bare($0)) }
+    // "splashing in the washing-up bowl" names the thing itself.
+    if at0 == nil, first.hasSuffix("ing"), first.count > 4 {
+      return tidy(words[...]).map(Cause.plain)
+    }
+    let at = words.firstIndex { clauseLinks.contains(bare($0)) } ?? words.firstIndex { bare($0) == "with" }
+    if let at, at + 1 < words.count {
+      return tidy(words[(at + 1)...]).map { .linked(link: bare(words[at]), thing: $0) }
+    }
+    return nil
+  }
 
   /// `dayStated` is false when the note doesn't say the day went better or worse,
   /// only what happened alongside: the tip then doesn't claim a better day.
-  public static func compose(action: TipAction, object: String, dayStated: Bool = true) -> String {
-    let first = object.split(separator: " ").first.map { $0.lowercased() } ?? ""
-    let reads = determiners.contains(first) || first.first?.isNumber == true
+  public static func compose(action: TipAction, object: String, dayStated: Bool = true,
+                              leftOut: Bool = false, note: String? = nil) -> String {
+    let found = cause(in: object, leftOut: leftOut || action != .repeatIt, note: note)
+    if action == .repeatIt, case let .liked(verb, thing) = found {
+      return "Your note says your child \(verb) \(thing). Try that again this week."
+    }
     if !dayStated {
-      return reads
-        ? "Try \(object) again this week. Your note ties it to what happened that day."
-        : "Try this again this week: “\(object)”. Your note ties it to what happened that day."
+      switch found {
+      case let .linked(link, thing): return "In your note, this happened \(link) \(thing). Try that again this week."
+      case let .plain(thing): return "Try \(thing) again this week. It's in your note."
+      default: return "Try doing what you did that day again this week."
+      }
+    }
+    let thing: String? = switch found {
+    case let .plain(t), let .linked(_, t), let .liked(_, t): t
+    case nil: nil
     }
     switch action {
     case .repeatIt:
-      return reads
-        ? "Try \(object) again this week. It's what was different on the better day in your note."
-        : "Try this again this week: “\(object)”. It's what was different on the better day in your note."
+      switch found {
+      case let .linked(link, thing): return "Your note says things went better \(link) \(thing). Try that again this week."
+      case let .plain(thing): return "Try \(thing) again this week. It's in your note from a better day."
+      default: return "Try doing what you did that day again this week. Your note shows it went better."
+      }
     case .leaveOut:
-      return reads
-        ? "Try leaving out \(object) again this week. That's what was different on the better day in your note."
-        : "Try leaving this out again this week: “\(object)”. That's what was different on the better day in your note."
+      guard let thing else { return "Try leaving out what you left out that day again this week. Your note shows it went better." }
+      return "Your note says things went better on the day without \(thing). Try leaving it out again this week."
     case .keepIt:
-      return reads
-        ? "Try keeping \(object) this week. Your note shows the day without it was harder."
-        : "Try keeping this in this week: “\(object)”. Your note shows the day without it was harder."
+      guard let thing else { return "Try keeping in what you missed that day. Your note shows the day without it was harder." }
+      return "Your note says the day without \(thing) was harder. Try keeping it in this week."
     }
   }
 }

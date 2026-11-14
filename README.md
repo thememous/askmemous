@@ -71,8 +71,10 @@ after seeing the cases. Every change and run is dated in
    own wording decides whether that day was better or worse. The tip can't
    name anything unsafe for the child's age, and the note has to be about the
    same thing as the question.
-6. **The app writes.** For example: "Try leaving out the late snack again this
-   week. That's what was different on the better day in your note."
+6. **The app writes.** It finds the cause inside the copied words, turns "we"
+   into "you", and fills a fixed sentence. From "Shared her blocks with Sam when
+   we set a timer for turns": "Your note says things went better when you set a
+   timer for turns. Try that again this week."
 7. **Hybrid, with consent.** With cloud checks off, nothing leaves the phone.
    With them on, the app asks the cloud once, and only when the on-device answer
    failed a check or the model wasn't available.
