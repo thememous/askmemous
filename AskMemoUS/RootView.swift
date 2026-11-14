@@ -14,6 +14,7 @@ struct RootView: View {
           Tab("Your questions", systemImage: "clock") { QuestionsView(child: child) }
           Tab("Settings", systemImage: "gearshape") { SettingsView(child: child) }
         }
+        .tint(Theme.accent)
       } else {
         ProgressView()
       }

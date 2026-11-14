@@ -59,6 +59,7 @@ struct AskView: View {
         .onChange(of: turns.count) { withAnimation { scroller.scrollTo("bottom", anchor: .bottom) } }
         .onChange(of: isAsking) { withAnimation { scroller.scrollTo("bottom", anchor: .bottom) } }
       }
+      .background(Theme.page)
       .safeAreaInset(edge: .bottom) { composer }
       .navigationTitle("Ask")
       .toolbar {
@@ -81,21 +82,20 @@ struct AskView: View {
 
   private var welcome: some View {
     VStack(alignment: .leading, spacing: 12) {
-      VStack(spacing: 8) {
+      VStack(spacing: 10) {
         MemoMascot(variant: .mascot, size: 120, float: true)
         Text("Hi, I'm Memo! Ask me anything about \(child.name).")
-          .font(.headline).multilineTextAlignment(.center)
+          .font(.headline).foregroundStyle(Theme.ink).multilineTextAlignment(.center)
+        Label("Answers come only from your notes. \(statusLine)", systemImage: statusSymbol)
+          .font(.footnote).foregroundStyle(Theme.muted)
+          .multilineTextAlignment(.center)
       }
       .frame(maxWidth: .infinity)
-      .padding(.bottom, 4)
-      Text("Answers come only from your notes. \(statusLine)")
-        .font(.subheadline).foregroundStyle(.secondary)
-      Text("Try asking").font(.footnote.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 6)
+      .padding(.bottom, 8)
+      Text("Try asking").font(.footnote.weight(.semibold)).foregroundStyle(Theme.muted)
       ForEach(Self.suggestions, id: \.self) { s in
-        Button { question = s; questionFocused = true } label: {
-          Text(s).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
+        Button { question = s; questionFocused = true } label: { Text(s) }
+          .buttonStyle(ChipStyle())
       }
     }
   }
@@ -106,10 +106,11 @@ struct AskView: View {
       Text(turn.said)
         .padding(.horizontal, 14).padding(.vertical, 10)
         .foregroundStyle(.white)
-        .background(Color.accentColor, in: .rect(cornerRadius: 18))
+        .background(Theme.accent, in: UnevenRoundedRectangle(cornerRadii: .init(
+          topLeading: Theme.radius, bottomLeading: Theme.radius, bottomTrailing: 4, topTrailing: Theme.radius)))
     }
-    HStack(alignment: .top, spacing: 8) {
-      MemoMascot(variant: .avatar, size: 32, float: isWaiting(turn))
+    HStack(alignment: .bottom, spacing: 8) {
+      MemoMascot(variant: .avatar, size: 30, float: isWaiting(turn))
       reply(turn)
     }
   }
@@ -119,22 +120,23 @@ struct AskView: View {
   }
 
   @ViewBuilder private func reply(_ turn: Turn) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 10) {
       switch turn.reply {
       case .waiting:
-        HStack(spacing: 8) { ProgressView(); Text("Reading your notes…").foregroundStyle(.secondary) }
+        HStack(spacing: 8) { ProgressView(); Text("Reading your notes…").foregroundStyle(Theme.muted) }
       case let .answer(answer):
-        SourceLabel(answer: answer).font(.caption).foregroundStyle(.secondary)
+        SourceLabel(answer: answer).font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
         AnswerBody(answer: answer, childName: child.name)
       case let .why(text):
-        Label("Answered by the app", systemImage: "text.book.closed").font(.caption).foregroundStyle(.secondary)
-        Text(text)
+        Label("Answered by the app", systemImage: "text.book.closed")
+          .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+        Text(text).foregroundStyle(Theme.ink)
       }
     }
     .padding(14)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 18))
-    .padding(.trailing, 8)
+    .themeCard(corners: .init(topLeading: Theme.radius, bottomLeading: 4,
+                              bottomTrailing: Theme.radius, topTrailing: Theme.radius))
   }
 
   private var followUps: some View {
@@ -142,10 +144,8 @@ struct AskView: View {
       HStack(spacing: 8) { followUpButtons }
       VStack(alignment: .leading, spacing: 8) { followUpButtons }
     }
-    .font(.subheadline)
-    .buttonStyle(.bordered)
-    .buttonBorderShape(.capsule)
-    .controlSize(.small)
+    .buttonStyle(ChipStyle(compact: true))
+    .padding(.leading, 38)
   }
 
   @ViewBuilder private var followUpButtons: some View {
@@ -157,16 +157,18 @@ struct AskView: View {
   /// Asked once, the first time a cloud check could help.
   private var consentCard: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("Check this in the cloud?").font(.headline)
+      Label("Check this in the cloud?", systemImage: "icloud").font(.headline).foregroundStyle(Theme.ink)
       Text("This iPhone couldn't find a good answer in your notes. A cloud model might.")
-      Text(CloudChecks.explainer(childName: child.name)).font(.footnote).foregroundStyle(.secondary)
+        .foregroundStyle(Theme.ink)
+      Text(CloudChecks.explainer(childName: child.name)).font(.footnote).foregroundStyle(Theme.muted)
       ViewThatFits(in: .horizontal) {
         HStack { consentButtons }
         VStack(alignment: .leading) { consentButtons }
       }
     }
     .padding(14)
-    .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 18))
+    .background(Theme.soft, in: .rect(cornerRadius: Theme.radius))
+    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1))
   }
 
   @ViewBuilder private var consentButtons: some View {
@@ -175,8 +177,13 @@ struct AskView: View {
       Task { await recheckInCloud() }
     }
     .buttonStyle(.borderedProminent)
+    .buttonBorderShape(.capsule)
     Button("Keep it on this iPhone") { cloudConsent = "declined" }
-      .buttonStyle(.bordered)
+      .buttonStyle(ChipStyle())
+  }
+
+  private var canSend: Bool {
+    !isAsking && !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private var composer: some View {
@@ -184,18 +191,28 @@ struct AskView: View {
       TextField(turns.isEmpty ? "Ask about \(child.name)" : "Ask something new", text: $question, axis: .vertical)
         .focused($questionFocused)
         .lineLimit(1...4)
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 18))
+        .padding(.horizontal, 16).padding(.vertical, 11)
+        .background(Theme.card, in: .rect(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Theme.field, lineWidth: 1.5))
       Button {
         Task { await askNew() }
       } label: {
-        Image(systemName: "arrow.up.circle.fill").font(.system(size: 32))
+        Group {
+          if isAsking { ProgressView().tint(.white) } else { Image(systemName: "arrow.up").font(.headline.weight(.bold)) }
+        }
+        .foregroundStyle(.white)
+        .frame(width: 44, height: 44)
+        .background(Theme.accent.opacity(canSend || isAsking ? 1 : 0.45), in: .circle)
       }
-      .disabled(isAsking || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      .disabled(!canSend)
       .accessibilityLabel("Ask")
     }
     .padding(.horizontal).padding(.vertical, 8)
     .background(.bar)
+  }
+
+  private var statusSymbol: String {
+    OnDeviceStatus.current == .available ? (cloudAllowed ? "iphone.and.arrow.forward" : "iphone") : "exclamationmark.circle"
   }
 
   private var statusLine: String {

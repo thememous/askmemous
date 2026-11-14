@@ -12,30 +12,34 @@ struct NotesView: View {
   var body: some View {
     NavigationStack {
       List {
-        Section {
-          ForEach(notes) { note in
-            VStack(alignment: .leading, spacing: 4) {
-              Text(note.text)
-              HStack(spacing: 6) {
-                Text(note.createdAt, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
-                if AskCheck.canSupportATip(note.text) {
-                  Text("·")
-                  Label("Can back a tip", systemImage: "lightbulb")
-                    .labelStyle(.titleAndIcon)
-                }
-              }
-              .font(.caption)
-              .foregroundStyle(.secondary)
-            }
+        if !notes.isEmpty {
+          Label {
+            Text("Notes that say how the day went and what was different (“slept longer the day we skipped the snack”) can back a tip in Ask.")
+          } icon: {
+            Image(systemName: "lightbulb.fill").foregroundStyle(Theme.accent)
           }
-          .onDelete { offsets in
-            for i in offsets { context.delete(notes[i]) }
-            try? context.save()
-          }
-        } footer: {
-          Text("Notes that say how the day went and what was different (“slept longer the day we skipped the snack”) are the ones Ask can build a tip on.")
+          .font(.footnote).foregroundStyle(Theme.muted)
+          .padding(12)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .background(Theme.soft, in: .rect(cornerRadius: 14))
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
+          .listRowInsets(.init(top: 4, leading: 16, bottom: 8, trailing: 16))
+        }
+        ForEach(notes) { note in
+          NoteCard(note: note)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(.init(top: 5, leading: 16, bottom: 5, trailing: 16))
+        }
+        .onDelete { offsets in
+          for i in offsets { context.delete(notes[i]) }
+          try? context.save()
         }
       }
+      .listStyle(.plain)
+      .scrollContentBackground(.hidden)
+      .background(Theme.page)
       .overlay {
         if notes.isEmpty {
           ContentUnavailableView("No notes yet", systemImage: "square.and.pencil",
@@ -50,6 +54,28 @@ struct NotesView: View {
       }
       .sheet(isPresented: $isAdding) { AddNoteSheet() }
     }
+  }
+}
+
+/// One note as a card: the parent's words, the day, and whether Ask can build a tip on it.
+private struct NoteCard: View {
+  let note: JournalNote
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(note.text).foregroundStyle(Theme.ink)
+      HStack(spacing: 8) {
+        Text(note.createdAt, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+          .font(.caption).foregroundStyle(Theme.muted)
+        Spacer(minLength: 0)
+        if AskCheck.canSupportATip(note.text) {
+          Badge(text: "Can back a tip", symbol: "lightbulb.fill")
+        }
+      }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .themeCard()
   }
 }
 

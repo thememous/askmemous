@@ -25,16 +25,23 @@ struct AnswerBody: View {
     VStack(alignment: .leading, spacing: 10) {
       switch answer.outcome {
       case let .tip(text, note):
-        Text(text)
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Based on your note").font(.caption).foregroundStyle(.secondary)
-          Text("“\(note.text)”").font(.callout).italic()
-          Text(note.createdAt, format: .dateTime.day().month(.abbreviated))
-            .font(.caption2).foregroundStyle(.secondary)
+        Text(text).font(.body.weight(.medium)).foregroundStyle(Theme.ink)
+        HStack(spacing: 10) {
+          RoundedRectangle(cornerRadius: 2).fill(Theme.accent).frame(width: 3)
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Based on your note").font(.caption.weight(.semibold)).foregroundStyle(Theme.muted)
+            Text("“\(note.text)”").font(.callout).italic().foregroundStyle(Theme.ink)
+            Text(note.createdAt, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+              .font(.caption2).foregroundStyle(Theme.muted)
+          }
         }
-        Text(FloorText.worryLine).font(.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.soft, in: .rect(cornerRadius: 12))
+        Text(FloorText.worryLine).font(.caption).foregroundStyle(Theme.muted)
       case let .floor(reason):
-        Text(FloorText.text(reason, childName: childName))
+        Text(FloorText.text(reason, childName: childName)).foregroundStyle(Theme.ink)
       }
       #if DEBUG
       DebugLines(answer: answer)
