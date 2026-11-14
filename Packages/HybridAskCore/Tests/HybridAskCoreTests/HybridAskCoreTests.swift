@@ -490,3 +490,28 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   #expect(AskCheck.locate("fed and fell asleep with", in: note) == nil)
   #expect(AskCheck.locate("the bottle propped on a rolled towel", in: note) != nil)
 }
+
+// MARK: - Follow-ups ("Another idea?", "That didn't work", "Why this note?")
+
+@Test func aFollowUpLeavesOutTheNotesAlreadyUsed() async {
+  let snack = AskNote(text: "Slept to 6:40 on the day we skipped the late snack.", category: "sleep", createdAt: daysAgo(2))
+  let dark = AskNote(text: "Settled in ten minutes with the room dark and the white noise on.", category: "sleep", createdAt: daysAgo(4))
+  let model = FakeModel(AskDraft(noteId: "n1", object: "the room dark and the white noise on", dayWas: .better))
+  let ask = HybridAsk(model: model)
+  let next = await ask.answer(question: "She keeps waking at 5am. What could I try?", child: mia, notes: [snack, dark],
+                              route: .onDeviceOnly, excluding: [snack.id], now: now)
+  // Only the unused note reached the model.
+  #expect(!model.lastPrompt.contains("late snack"))
+  if case let .tip(_, note) = next.outcome { #expect(note == dark) } else { Issue.record("\(next.outcome)") }
+  // Every usable note used: the app says so, and no model is asked.
+  let none = await ask.answer(question: "She keeps waking at 5am. What could I try?", child: mia, notes: [snack, dark],
+                              route: .onDeviceOnly, excluding: [snack.id, dark.id], now: now)
+  #expect(none.outcome == .floor(.noOtherNote))
+}
+
+@Test func whyThisNoteQuotesTheNotesOwnWord() {
+  #expect(AskCheck.whyThisNote("Settled in ten minutes with the room dark.").hasPrefix("This note says the day went better (“Settled”)"))
+  #expect(AskCheck.whyThisNote("Fussy all afternoon on the day we skipped the morning nap.").hasPrefix("This note says the day was harder (“Fussy”)"))
+  #expect(AskCheck.whyThisNote("Said 'ball' when we played catch.").hasPrefix("This note ties what happened"))
+  #expect(AskCheck.whyThisNote("Slept to 6:40 on the day we skipped the late snack.").contains("no AI wrote it"))
+}

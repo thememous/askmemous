@@ -125,6 +125,8 @@ public enum FloorReason: String, Sendable, Codable {
   case modelUnavailable
   /// Cloud-only was asked for, but the parent hasn't allowed cloud checks.
   case cloudNotAllowed
+  /// A follow-up ("Another idea?") after every note that could back a tip was used.
+  case noOtherNote
 }
 
 /// What the parent sees.

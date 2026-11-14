@@ -17,6 +17,7 @@ public struct HybridAsk: Sendable {
     notes: [AskNote],
     route: AskRoute = .hybrid,
     cloudAllowed: Bool = false,
+    excluding used: Set<UUID> = [],
     now: Date = Date()
   ) async -> AskAnswer {
     let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -33,9 +34,12 @@ public struct HybridAsk: Sendable {
     // Only notes that could back a tip are worth showing; if there are none, no model can help.
     let usable = written.filter { AskCheck.canSupportATip(AskPrompt.redact($0.text, name: child.name)) }
     guard !usable.isEmpty else { return .app(.noSupportingNote) }
+    // A follow-up ("Another idea?", "That didn't work") leaves out the notes already used.
+    let fresh = usable.filter { !used.contains($0.id) }
+    guard !fresh.isEmpty else { return .app(.noOtherNote) }
 
     // Only the few notes that matter, with the child's name replaced, go to any model.
-    let selected = AskRetrieval.select(usable, question: q, limit: AskRetrieval.defaultLimit)
+    let selected = AskRetrieval.select(fresh, question: q, limit: AskRetrieval.defaultLimit)
     let numbered = AskPrompt.number(selected, now: now, childName: child.name)
 
     let instructions = AskPrompt.instructions(for: child)
@@ -135,6 +139,8 @@ public enum FloorText {
       "We won't suggest repeating that one. For sleep, feeding and car-seat safety at \(childName)'s age, your doctor or local health service has the current guidance."
     case .modelUnavailable:
       "Couldn't get an answer this time. Try again in a moment, or ask it a different way."
+    case .noOtherNote:
+      "That's every note that could back a tip for this so far. Next time you try something, add a quick note about how it went: the next answer can build on it."
     case .cloudNotAllowed:
       "Cloud checks are off. Turn them on to send this question to the cloud, or ask on this iPhone."
     }

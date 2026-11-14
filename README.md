@@ -79,6 +79,12 @@ after seeing the cases. Every change and run is dated in
    With them on, the app asks the cloud once, and only when the on-device answer
    failed a check or the model wasn't available.
 
+**Follow-ups.** Ask is a short conversation. Under each tip, "Another idea"
+and "Didn't help" ask the same question again with the notes already used left
+out, so every follow-up runs the same checked path. "Why this note?" is answered
+by the app from the note's own words, with no model. When no unused note can
+back a tip, the app says so.
+
 The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 `AskModel` protocol. `HybridAskFirebase` is the Firebase AI Logic version.
 

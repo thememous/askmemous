@@ -198,6 +198,40 @@ public enum AskCheck {
     }
   }
 
+  // MARK: - Why this note
+
+  /// "Why this note?", answered by the app from the note's own words. No model.
+  public static func whyThisNote(_ text: String) -> String {
+    let part = decidingPart(text) ?? text
+    let read = reading(part)
+    let clue = clueWord(in: part, for: read)
+    let quoted = clue.map { " (“\($0)”)" } ?? ""
+    let lead: String
+    switch read {
+    case .better:
+      lead = "This note says the day went better\(quoted) and says what was different that day. The tip asks you to try that again."
+    case .worse:
+      lead = "This note says the day was harder\(quoted) and says what was missing that day. The tip asks you to keep it in."
+    case .silent, .mixed:
+      lead = "This note ties what happened to something you did that day. It doesn't say the day went better, so the tip only suggests trying it again."
+    }
+    return lead + " The app picked this note's own words and wrote the tip itself; no AI wrote it."
+  }
+
+  /// The word in the note that says how the day went ("Settled", "Fussy").
+  static func clueWord(in text: String, for read: Reading) -> String? {
+    let lower = " " + normalized(text) + " "
+    if read == .better, let phrase = betterPhrases.first(where: { lower.contains(" \($0) ") }) {
+      return phrase.replacingOccurrences(of: " t ", with: "'t ")
+    }
+    let wanted: Set<String> = read == .better ? betterWords : read == .worse ? worseWords : []
+    for word in text.split(whereSeparator: \.isWhitespace) {
+      let t = tokens(String(word))
+      if t.count == 1, wanted.contains(t[0]) { return word.trimmingCharacters(in: .punctuationCharacters) }
+    }
+    return nil
+  }
+
   // MARK: - Medical wording
 
   static let medicalStems = [

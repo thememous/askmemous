@@ -2,13 +2,27 @@ import SwiftUI
 import HybridAskCore
 
 /// One answer as a parent sees it: the tip (or the app's fixed reply), the note it
-/// came from, and where it was answered. Used on Ask and in "Your questions".
+/// came from, and where it was answered. Used in "Your questions".
 struct AnswerSection: View {
   let answer: AskAnswer
   let childName: String
 
   var body: some View {
     Section {
+      AnswerBody(answer: answer, childName: childName)
+    } header: {
+      SourceLabel(answer: answer)
+    }
+  }
+}
+
+/// The answer's content, shared by the Form section and the Ask conversation.
+struct AnswerBody: View {
+  let answer: AskAnswer
+  let childName: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
       switch answer.outcome {
       case let .tip(text, note):
         Text(text)
@@ -25,8 +39,6 @@ struct AnswerSection: View {
       #if DEBUG
       DebugLines(answer: answer)
       #endif
-    } header: {
-      SourceLabel(answer: answer)
     }
   }
 }
