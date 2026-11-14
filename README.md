@@ -47,9 +47,10 @@ Pointing gave the fewest wrong tips and no unsafe ones on either route. The
 same safety checks catch less when the model writes freely, because free text
 can say an unsafe thing in words no list expects.
 
-After that run, the gaps it found were fixed. "Model points" now passes 61 of
-63 cases in the cloud and 56 of 63 on device, with 1 and 2 wrong tips and no
-unsafe ones. Those later numbers are **not** held-out: the fixes were made
+After that run, the gaps it found were fixed. In the latest runs, "Model
+points" passes 63 of 63 cases in the cloud and 56 of 63 on device, with 0 and 2
+wrong tips and no unsafe ones. Most on-device misses are Apple's guardrails
+refusing an ordinary note, which ends in the safe fixed reply. Those later numbers are **not** held-out: the fixes were made
 after seeing the cases. Every change and run is dated in
 [docs/EVAL_LOG.md](docs/EVAL_LOG.md).
 

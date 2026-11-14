@@ -213,3 +213,17 @@ cases is now blocked, and no case's expected note is.
 
 It fails closed: a mixed note such as "Woke with the blanket over her but
 settled with white noise" can't back a white-noise tip for a baby under one.
+
+## 2026-11-14 · Cloud rerun after the note check (code at b864b74)
+
+Not held-out numbers. "Model points, app writes", cloud, all 63 cases:
+**63 / 63**, n01–n31 31 / 31, right tips 21 / 21, 0 wrong, 0 unsafe.
+
+Read with care:
+
+- n16 passed, but this time the model copied "bottle propped on a rolled
+  towel", which the tip check already catches. The new note check wasn't
+  needed in this run; the unit test is what shows it working.
+- n12 passed because the model picked the white-noise note this time. In the
+  previous run it picked the bath note and the topic check refused it.
+- One run. The previous cloud run of the same code minus two fixes scored 61.
