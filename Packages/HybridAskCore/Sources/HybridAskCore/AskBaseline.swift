@@ -112,7 +112,7 @@ public struct BaselineAsk: Sendable {
       outcome = .tip(text: d.tip, basedOn: AskNote(text: "(no such note: \(d.noteId))", createdAt: now))
     }
     if checked, case let .tip(text, note) = outcome {
-      if AskSafety.unsafePhrase(inTip: text, ageMonths: child.ageMonths) != nil {
+      if AskSafety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
         outcome = .floor(.unsafeTip)
       } else if AskCheck.mentionsMedical(text) {
         outcome = .floor(.medicalTopic)

@@ -79,6 +79,13 @@ public enum AskSafety {
     return nil
   }
 
+  /// A tip is unsafe if it names something unsafe for the child's age, or if
+  /// the note it rests on does. "Try 'Fed and fell asleep' again" never says
+  /// "propped bottle", but repeating that day would (n16, 2026-11-14).
+  public static func unsafePhrase(inTip tip: String, basedOn note: AskNote, ageMonths: Int?) -> String? {
+    unsafePhrase(inTip: tip, ageMonths: ageMonths) ?? unsafePhrase(inTip: note.text, ageMonths: ageMonths)
+  }
+
   /// Safe phrases removed before matching ("tummy time" is recommended for awake babies).
   static let safeExceptions = ["tummy time", "bath water", "warm bath"]
 

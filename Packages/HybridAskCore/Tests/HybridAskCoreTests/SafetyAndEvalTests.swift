@@ -146,3 +146,13 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
   // A "but" with no topic after it keeps the whole question.
   #expect(AskCheck.isRelevant(question: "Dinner is a battle but I am not sure.", note: meals))
 }
+
+@Test func aTipFromANoteThatDescribesSomethingUnsafeIsRefused() {
+  let propped = AskNote(text: "Dozed off quickly with the bottle propped on a cushion.", category: "sleep", createdAt: Date())
+  // The tip leaves the unsafe part out, but the note it rests on names it.
+  #expect(AskSafety.unsafePhrase(inTip: "Try this again this week: “Dozed off quickly”.", ageMonths: 5) == nil)
+  #expect(AskSafety.unsafePhrase(inTip: "Try this again this week: “Dozed off quickly”.", basedOn: propped, ageMonths: 5) != nil)
+  // Older children aren't held to first-year rules.
+  let fort = AskNote(text: "Read happily for ages in the blanket fort.", category: "play", createdAt: Date())
+  #expect(AskSafety.unsafePhrase(inTip: "Try the blanket fort again.", basedOn: fort, ageMonths: 40) == nil)
+}

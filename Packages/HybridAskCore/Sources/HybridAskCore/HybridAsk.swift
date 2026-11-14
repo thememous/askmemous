@@ -90,7 +90,7 @@ public struct HybridAsk: Sendable {
     let result = try await model.draft(instructions: instructions, prompt: prompt, route: route)
     var outcome = AskCheck.review(result.draft, notes: numbered.ids, child: child)
     if case let .tip(text, note) = outcome {
-      if AskSafety.unsafePhrase(inTip: text, ageMonths: child.ageMonths) != nil {
+      if AskSafety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
         outcome = .floor(.unsafeTip)
       } else if !AskCheck.isRelevant(question: question, note: note) {
         outcome = .floor(.noSupportingNote)
