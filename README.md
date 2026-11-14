@@ -70,7 +70,8 @@ after seeing the cases. Every change and run is dated in
 5. **The app checks.** The copied words must really be in the note. The note's
    own wording decides whether that day was better or worse. The tip can't
    name anything unsafe for the child's age, and the note has to be about the
-   same thing as the question.
+   same thing as the question. If the app refuses the note the model picked, it
+   asks once more without that note. Once, so a parent never waits long.
 6. **The app writes.** It finds the cause inside the copied words, turns "we"
    into "you", and fills a fixed sentence. From "Shared her blocks with Sam when
    we set a timer for turns": "Your note says things went better when you set a

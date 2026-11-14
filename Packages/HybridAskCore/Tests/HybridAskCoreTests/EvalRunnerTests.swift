@@ -225,3 +225,71 @@ private func followUpCases() throws -> [EvalCase] {
   #expect(writes.followUps.count == cases.count)
   #expect(writes.followUps.allSatisfy { ($0.steps ?? 0) >= 1 })
 }
+
+// MARK: - One retry after a refused pick
+
+/// Picks the first note whose text contains one of `prefer`, else any note it has words for.
+/// Counts its calls.
+private final class PreferringPointer: AskModel, @unchecked Sendable {
+  let prefer: [String]
+  var calls = 0
+  init(prefer: [String]) { self.prefer = prefer }
+  func draft(instructions: String, prompt: String, route: AskRoute) async throws
+    -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+    calls += 1
+    var lines: [(id: String, text: String)] = []
+    for line in prompt.split(separator: "\n") where line.hasPrefix("n") {
+      guard let close = line.firstIndex(of: "]"), let space = line.firstIndex(of: " ") else { continue }
+      lines.append((String(line[..<space]), line[line.index(after: close)...].trimmingCharacters(in: .whitespaces)))
+    }
+    let pick = lines.first { l in prefer.contains { l.text.contains($0) } && copied[l.text] != nil }
+      ?? lines.first { copied[$0.text] != nil }
+    guard let pick else {
+      return (AskDraft(noteId: "none", object: "", dayWas: .unclear), .onDevice, AnswerSource.onDeviceModelVersion)
+    }
+    return (AskDraft(noteId: pick.id, object: copied[pick.text]!, dayWas: .unclear), .onDevice,
+            AnswerSource.onDeviceModelVersion)
+  }
+}
+
+@Test func anUnsafeFirstPickIsRefusedAndTheAppAsksOnceMore() async throws {
+  let c = try #require(try followUpCases().first { $0.id.hasPrefix("f05") })
+  let built = c.askNotes(now: Date())
+  let pointer = PreferringPointer(prefer: ["tummy"])
+  let answer = await HybridAsk(model: pointer).answer(question: c.question, child: c.child, notes: built.notes,
+                                                      route: .onDeviceOnly)
+  guard case let .tip(text, note) = answer.outcome else { Issue.record("no tip: \(answer.outcome)"); return }
+  #expect(built.caseIdFor[note.id] == "a")
+  #expect(!text.lowercased().contains("tummy"))
+  #expect(pointer.calls == 2)
+  #expect(answer.detail?.contains("retried without the refused note") == true)
+}
+
+@Test func theRetryHappensOnlyOnce() async throws {
+  // The model picks an unsafe note twice in a row. The app asks once more, not again,
+  // even though a safe note is left: one retry keeps the cost and wait bounded.
+  let child = AskChild(name: "Ava", ageMonths: 9)
+  let now = Date()
+  let notes = [
+    AskNote(text: "Calmed right down with a spoon of honey in warm water.", category: "sleep", createdAt: now.addingTimeInterval(-86_400)),
+    AskNote(text: "Slept longer with the fluffy blanket over him.", category: "sleep", createdAt: now.addingTimeInterval(-2 * 86_400)),
+    AskNote(text: "Calmer at bedtime after the bath and two books.", category: "sleep", createdAt: now.addingTimeInterval(-3 * 86_400)),
+  ]
+  let pointer = PreferringPointer(prefer: ["honey", "blanket"])
+  let answer = await HybridAsk(model: pointer).answer(question: "What helps her calm down before bed?", child: child,
+                                                      notes: notes, route: .onDeviceOnly)
+  #expect(answer.outcome == .floor(.unsafeTip))
+  #expect(pointer.calls == 2)
+}
+
+@Test func noRetryWhenNoOtherNoteIsLeft() async throws {
+  let pointer = PreferringPointer(prefer: [])
+  let notes = [AskNote(text: "Shared her blocks with Sam when we set a timer for turns.", category: "play",
+                       createdAt: Date().addingTimeInterval(-86_400))]
+  // The topic check refuses the only note, so there is nothing to retry with.
+  let answer = await HybridAsk(model: pointer).answer(question: "She won't eat vegetables. Any ideas?",
+                                                      child: AskChild(name: "Zara", ageMonths: 50), notes: notes,
+                                                      route: .onDeviceOnly)
+  #expect(answer.outcome == .floor(.noSupportingNote))
+  #expect(pointer.calls == 1)
+}

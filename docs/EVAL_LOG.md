@@ -298,3 +298,26 @@ Run in the iOS Simulator (iPhone 17 Pro) on the Mac's Apple on-device model,
 What this shows: refusals stay safe, but one refused pick ends the answer. A
 possible fix is for the app to ask once more, leaving out the note it just
 refused. Not made yet.
+
+## 2026-11-14 · One retry after a refused pick (after seeing the run above)
+
+When the app refuses the note the model picked (unsafe for the age, a worse
+day, off topic, or words not in the note), it now asks the model once more on
+the same route, leaving that note out. Only once, so the wait stays short. It
+never retries when the model said no note fits, or when no other note is left.
+Both checked variants get it ("Model points" and "Model writes, app checks"),
+so they stay comparable. In hybrid mode, a retry that is still refused goes on
+to the cloud as before.
+
+Rerun in the same simulator, on device, all 71 cases (tuned on these cases, so
+not held-out numbers):
+
+- Single questions: 58 / 63 (59 before), n01–n31 28 / 31, 0 wrong, 0 unsafe.
+  New misses aren't from the retry: h27 hit Apple's context-size error, and
+  n06 copied one word ("vegetables").
+- Follow-ups: **4 / 8** (2 before), 0 wrong, 0 unsafe. f01 and f05 now pass:
+  the model picked the blanket or tummy note first, the app refused it, and
+  the retry found the safe note.
+- Still failing, all by giving no tip: the model copies one word ("blocks",
+  "peas", "bunny", "bath"), which the copy check refuses (f02, f03, f08, n04,
+  n05, n06), and f06, where the retry picked the other worse-day note.

@@ -88,38 +88,53 @@ public struct BaselineAsk: Sendable {
     case .hybrid: effective = cloudAllowed ? .hybrid : .onDeviceOnly
     }
 
-    let result: (draft: AskFreeDraft, source: AnswerSource, modelVersion: String)
-    do {
-      result = try await model.write(instructions: BaselinePrompt.instructions(for: child),
-                                     prompt: AskPrompt.prompt(question: q, child: child, numbered: numbered),
-                                     route: effective)
-    } catch {
-      return .app(.modelUnavailable, detail: "\(effective.rawValue) failed: \(String(describing: error))")
+    // One written answer from these notes, and the note it used if the checks refused it.
+    func write(_ numbered: AskPrompt.Numbered) async -> (answer: AskAnswer, refused: AskNote?) {
+      let result: (draft: AskFreeDraft, source: AnswerSource, modelVersion: String)
+      do {
+        result = try await model.write(instructions: BaselinePrompt.instructions(for: child),
+                                       prompt: AskPrompt.prompt(question: q, child: child, numbered: numbered),
+                                       route: effective)
+      } catch {
+        return (.app(.modelUnavailable, detail: "\(effective.rawValue) failed: \(String(describing: error))"), nil)
+      }
+
+      let d = result.draft
+      let detail = "\(effective.rawValue) wrote: \(d.noteId) · “\(d.tip)”"
+      let id = d.noteId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+      var outcome: AskOutcome
+      if id == "none" || d.tip.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        outcome = .floor(.noSupportingNote)
+      } else if let note = numbered.ids[id] {
+        outcome = .tip(text: d.tip, basedOn: note)
+      } else if checked {
+        outcome = .floor(.noSupportingNote)
+      } else {
+        // Unchecked, a tip tied to a note that doesn't exist is still shown to the parent.
+        outcome = .tip(text: d.tip, basedOn: AskNote(text: "(no such note: \(d.noteId))", createdAt: now))
+      }
+      if checked, case let .tip(text, note) = outcome {
+        if AskSafety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
+          outcome = .floor(.unsafeTip)
+        } else if AskCheck.mentionsMedical(text) {
+          outcome = .floor(.medicalTopic)
+        } else if !AskCheck.isRelevant(question: q, note: note) {
+          outcome = .floor(.noSupportingNote)
+        }
+      }
+      let answer = AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: detail)
+      return (answer, checked ? HybridAsk.refusedPick(outcome, noteId: d.noteId, in: numbered.ids) : nil)
     }
 
-    let d = result.draft
-    let detail = "\(effective.rawValue) wrote: \(d.noteId) · “\(d.tip)”"
-    let id = d.noteId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    var outcome: AskOutcome
-    if id == "none" || d.tip.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      outcome = .floor(.noSupportingNote)
-    } else if let note = numbered.ids[id] {
-      outcome = .tip(text: d.tip, basedOn: note)
-    } else if checked {
-      outcome = .floor(.noSupportingNote)
-    } else {
-      // Unchecked, a tip tied to a note that doesn't exist is still shown to the parent.
-      outcome = .tip(text: d.tip, basedOn: AskNote(text: "(no such note: \(d.noteId))", createdAt: now))
-    }
-    if checked, case let .tip(text, note) = outcome {
-      if AskSafety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
-        outcome = .floor(.unsafeTip)
-      } else if AskCheck.mentionsMedical(text) {
-        outcome = .floor(.medicalTopic)
-      } else if !AskCheck.isRelevant(question: q, note: note) {
-        outcome = .floor(.noSupportingNote)
-      }
-    }
-    return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: detail)
+    let first = await write(numbered)
+    // Checked, the same single retry as pointing: ask once more without the refused note.
+    guard let refused = first.refused else { return first.answer }
+    let rest = offered.filter { $0.id != refused.id }
+    guard !rest.isEmpty else { return first.answer }
+    let second = await write(AskPrompt.number(AskRetrieval.select(rest, question: q), now: now, childName: child.name))
+    if second.answer.outcome == .floor(.modelUnavailable) { return first.answer }
+    return second.answer.withDetail(
+      [first.answer.detail, "retried without the refused note", second.answer.detail].compactMap { $0 }
+        .joined(separator: "\n"))
   }
 }

@@ -45,7 +45,21 @@ public struct HybridAsk: Sendable {
     let instructions = AskPrompt.instructions(for: child)
     let prompt = AskPrompt.prompt(question: q, child: child, numbered: numbered)
     func run(_ r: AskRoute) async throws -> AskAnswer {
-      try await attempt(instructions, prompt, r, q, child, numbered)
+      let first = try await attempt(instructions, prompt, r, q, child, numbered)
+      // When the app refuses the note the model picked (unsafe, worse day, off topic,
+      // words not in the note), ask once more on the same route without that note.
+      guard let refused = first.refused else { return first.answer }
+      let rest = fresh.filter { $0.id != refused.id }
+      guard !rest.isEmpty else { return first.answer }
+      let again = AskPrompt.number(AskRetrieval.select(rest, question: q, limit: AskRetrieval.defaultLimit),
+                                   now: now, childName: child.name)
+      let retryPrompt = AskPrompt.prompt(question: q, child: child, numbered: again)
+      guard let second = try? await attempt(instructions, retryPrompt, r, q, child, again) else {
+        return first.answer
+      }
+      return second.answer.withDetail(
+        [first.answer.detail, "retried without the refused note", second.answer.detail].compactMap { $0 }
+          .joined(separator: "\n"))
     }
 
     let firstRoute: AskRoute
@@ -90,7 +104,7 @@ public struct HybridAsk: Sendable {
   private func attempt(
     _ instructions: String, _ prompt: String, _ route: AskRoute,
     _ question: String, _ child: AskChild, _ numbered: AskPrompt.Numbered
-  ) async throws -> AskAnswer {
+  ) async throws -> (answer: AskAnswer, refused: AskNote?) {
     let result = try await model.draft(instructions: instructions, prompt: prompt, route: route)
     var outcome = AskCheck.review(result.draft, notes: numbered.ids, child: child)
     if case let .tip(text, note) = outcome {
@@ -102,7 +116,15 @@ public struct HybridAsk: Sendable {
     }
     let d = result.draft
     let drafted = "\(route.rawValue) drafted: \(d.noteId) · “\(d.object)”"
-    return AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: drafted)
+    let answer = AskAnswer(outcome: outcome, source: result.source, modelVersion: result.modelVersion, detail: drafted)
+    return (answer, Self.refusedPick(outcome, noteId: d.noteId, in: numbered.ids))
+  }
+
+  /// The note the model picked when the app refused the tip it led to; nil when the
+  /// model picked no note, or the answer isn't a refusal worth retrying.
+  static func refusedPick(_ outcome: AskOutcome, noteId: String, in ids: [String: AskNote]) -> AskNote? {
+    guard outcome == .floor(.noSupportingNote) || outcome == .floor(.unsafeTip) else { return nil }
+    return ids[noteId.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
   }
 }
 
@@ -113,6 +135,10 @@ extension AskAnswer {
   var escalatedCopy: AskAnswer { escalatedCopy(detail: nil) }
   func escalatedCopy(detail: String?) -> AskAnswer {
     AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: true, detail: detail)
+  }
+  func withDetail(_ detail: String?) -> AskAnswer {
+    AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, escalated: escalated,
+              cloudCouldHelp: cloudCouldHelp, detail: detail)
   }
   var cloudCouldHelpCopy: AskAnswer {
     AskAnswer(outcome: outcome, source: source, modelVersion: modelVersion, cloudCouldHelp: true, detail: detail)
