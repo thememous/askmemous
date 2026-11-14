@@ -21,11 +21,14 @@ targets:
     entitlements:
       path: AskMemoUS/AskMemoUS.entitlements
       properties:
-        com.apple.developer.devicecheck.appattest-environment: development
+        com.apple.developer.devicecheck.appattest-environment: production # TestFlight/App Store; debug builds use the debug provider
     info:
       path: AskMemoUS/Info.plist
       properties:
         CFBundleDisplayName: AskMemoUS
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION) # raise in settings below for each upload
+        ITSAppUsesNonExemptEncryption: false # HTTPS only
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -38,7 +41,7 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
-        ASSETCATALOG_COMPILER_APPICON_NAME: "" # no app icon yet; the catalog holds only the mascot
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon # Memo on night blue, MemoUS art
     dependencies:
       - package: Firebase
         product: FirebaseCore

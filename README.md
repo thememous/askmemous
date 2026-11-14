@@ -116,6 +116,7 @@ The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 AskMemoUS/                     SwiftUI app: Ask, Notes, Your questions, Settings, Eval runner
 AskMemoUS/Mascot.xcassets/     Memo, the MemoUS mascot (not open-licensed, see MASCOT-LICENSE.md)
 AskMemoUS/TabIcons.xcassets/   The tab icons, MemoUS art (not open-licensed, see MASCOT-LICENSE.md)
+AskMemoUS/AppIcon.xcassets/    The app icon, MemoUS art (not open-licensed, see MASCOT-LICENSE.md)
 Packages/HybridAskCore/        Gates, note filter, prompt, checks, tip text, eval cases and runner
 Packages/HybridAskFirebase/    AskModel backed by Firebase AI Logic (on-device + Gemini)
 docs/EVAL_LOG.md               Every eval change and run, dated
@@ -180,5 +181,5 @@ the Gemini free tier. Share the table or the full details from the same screen.
 ## License
 
 [Apache License 2.0](LICENSE), except the MemoUS art. Memo, the star that
-answers in the Ask screen, and the tab icons belong to MemoUS and are not
+answers in the Ask screen, the app icon and the tab icons belong to MemoUS and are not
 open-licensed. See [MASCOT-LICENSE.md](MASCOT-LICENSE.md).
