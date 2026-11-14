@@ -321,3 +321,26 @@ not held-out numbers):
 - Still failing, all by giving no tip: the model copies one word ("blocks",
   "peas", "bunny", "bath"), which the copy check refuses (f02, f03, f08, n04,
   n05, n06), and f06, where the retry picked the other worse-day note.
+
+## 2026-11-14 · One-word copies read as the note's own clause (after seeing the run above)
+
+The model often copies a single word ("bunny", "bath", "cot"). The copy check
+used to refuse anything under two words. Now a single word that is in the note
+is read as the note's own clause: from the nearest link word before it ("when
+she brought her bunny", "skipped the bath"), or the whole clause when nothing
+links it. The note still decides better or worse and the direction. The unsafe
+check still reads the whole note, and a worse day where something was done
+still backs nothing. Words that point at nothing ("the", "when", "she", under
+three letters) and words not in the note ("vegetables" for "veg") are still
+refused.
+
+Rerun in the same simulator, on device, all 71 cases (tuned, not held-out):
+
+- Follow-ups: **7 / 8** (4 before), 0 wrong, 0 unsafe. f08's second step hit
+  Apple's guardrail ("May contain unsafe content") on an ordinary drop-off note.
+- Single questions: 59 / 63, n01–n31 29 / 31, right tips 19 / 21, **1 wrong**,
+  0 unsafe. The wrong tip is dev-sleep-snack: the model copied the whole park
+  nap note instead of the snack note. That was a multi-word copy, so this
+  change doesn't touch it, and the same pick was seen on the phone before.
+  Other misses: h25 and n18 (Apple guardrail), n10 (the model copied the whole
+  note, including the part before "but", which the check doesn't accept).

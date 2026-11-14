@@ -109,6 +109,11 @@ public enum AskCheck {
       markedLeftOut = true
       obj.removeFirst()
     }
+    // One word ("bunny") still points into the note: read it as the note's own clause.
+    if obj.count == 1, let clause = clause(around: obj[0], in: noteText) {
+      guard let found = locate(clause, in: noteText) else { return nil }
+      return (found.span, found.leftOut || markedLeftOut)
+    }
     guard obj.count >= 2, obj.count <= 14 else { return nil }
 
     // Note tokens, each remembering which original word it came from.
@@ -156,6 +161,27 @@ public enum AskCheck {
       .trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
     let before = noteTokens[max(0, best.first - 3)..<best.first].map(\.token)
     return (span, markedLeftOut || leftOutInside || before.contains(where: leftOutWords.contains))
+  }
+
+  /// The clause of the note around a single copied word: from the nearest link word
+  /// before it ("when she brought her bunny", "skipped the bath"), or the whole clause
+  /// when nothing links it ("Shared her blocks with Sam when we set a timer for turns").
+  /// Nil when the word isn't in the note, or is too small to point at anything.
+  static func clause(around word: String, in noteText: String) -> String? {
+    guard word.count >= 3, !linkWords.contains(word), !TipText.determiners.contains(word),
+          !TipText.subjects.contains(word) else { return nil }
+    let words = noteText.split(whereSeparator: \.isWhitespace).map(String.init)
+    guard let at = words.firstIndex(where: { tokens($0).contains(word) }) else { return nil }
+    let ends: (String) -> Bool = { $0.hasSuffix(",") || $0.hasSuffix(";") || $0.hasSuffix(".") }
+    var start = at
+    while start > 0, !ends(words[start - 1]) { start -= 1 }
+    var end = at
+    while end < words.count - 1, !ends(words[end]) { end += 1 }
+    if let link = (start..<at).last(where: { tokens(words[$0]).contains(where: linkWords.contains) }) {
+      start = link
+    }
+    let picked = words[start...end].prefix(14)
+    return picked.count >= 2 ? picked.joined(separator: " ") : nil
   }
 
   // MARK: - Better or worse day, from the note's own words

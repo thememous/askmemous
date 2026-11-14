@@ -103,7 +103,9 @@ private final class FakeModel: AskModel, @unchecked Sendable {
   #expect(AskCheck.locate("skipped the LATE snack.", in: text)?.leftOut == true)
   #expect(AskCheck.locate("the day we skipped the late snack", in: text)?.span == "the late snack")
   #expect(AskCheck.locate("gave her a late snack", in: text) == nil)
-  #expect(AskCheck.locate("snack", in: text) == nil)
+  // One word is read as the note's own clause, direction included.
+  #expect(AskCheck.locate("snack", in: text)?.span == "the late snack")
+  #expect(AskCheck.locate("snack", in: text)?.leftOut == true)
   #expect(AskCheck.locate("loves exploring the garden", in: notes[1].text) == nil)
 }
 
@@ -514,4 +516,55 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   #expect(AskCheck.whyThisNote("Fussy all afternoon on the day we skipped the morning nap.").hasPrefix("This note says the day was harder (“Fussy”)"))
   #expect(AskCheck.whyThisNote("Said 'ball' when we played catch.").hasPrefix("This note ties what happened"))
   #expect(AskCheck.whyThisNote("Slept to 6:40 on the day we skipped the late snack.").contains("no AI wrote it"))
+}
+
+// MARK: - One-word copies
+
+@Test func aOneWordCopyIsReadAsTheNotesOwnClause() {
+  #expect(AskCheck.locate("bunny", in: "Happier at nursery drop-off when she brought her bunny.")?.span
+    == "she brought her bunny")
+  #expect(AskCheck.locate("cot", in: "Napped 90 minutes when we did the nap in the cot, not the pram.")?.span
+    == "we did the nap in the cot")
+  let bath = AskCheck.locate("bath", in: "Big meltdown at bedtime the night we skipped the bath.")
+  #expect(bath?.span == "the bath" && bath?.leftOut == true)
+  // Nothing links the word: the whole clause, and the tip names the cause inside it.
+  #expect(AskCheck.locate("blocks", in: "Shared her blocks with Sam when we set a timer for turns.") != nil)
+  // Not in the note, or too small to point at anything.
+  #expect(AskCheck.locate("vegetables", in: "Ate all her veg when she helped wash them first.") == nil)
+  #expect(AskCheck.locate("the", in: "Calmer at bedtime after the bath and two books.") == nil)
+  #expect(AskCheck.locate("when", in: "Calmer at bedtime after the bath and two books.") == nil)
+}
+
+@Test func oneWordCopiesBecomeTipsOnlyWhereTheNoteBacksOne() {
+  let child = AskChild(name: "Isla", ageMonths: 30)
+  func review(_ text: String, _ word: String, age: Int? = 30) -> AskOutcome {
+    let note = AskNote(text: text, category: nil, createdAt: Date())
+    return AskCheck.review(AskDraft(noteId: "n1", object: word, dayWas: .unclear), notes: ["n1": note],
+                           child: AskChild(name: child.name, ageMonths: age))
+  }
+  guard case let .tip(bunny, _) = review("Happier at nursery drop-off when she brought her bunny.", "bunny") else {
+    Issue.record("no tip from bunny"); return
+  }
+  #expect(bunny == "Your note says things went better when she brought her bunny. Try that again this week.")
+  guard case let .tip(bath, _) = review("Big meltdown at bedtime the night we skipped the bath.", "bath") else {
+    Issue.record("no tip from bath"); return
+  }
+  #expect(bath.contains("keeping it in"))
+  // A worse day where something was done still backs nothing.
+  #expect(review("Cried at drop-off when we stayed to settle her in.", "settle") == .floor(.noSupportingNote))
+}
+
+@Test func aOneWordCopyFromAnUnsafeNoteIsStillRefused() async {
+  struct OneWord: AskModel {
+    func draft(instructions: String, prompt: String, route: AskRoute) async throws
+      -> (draft: AskDraft, source: AnswerSource, modelVersion: String) {
+      (AskDraft(noteId: "n1", object: "blanket", dayWas: .unclear), .onDevice, AnswerSource.onDeviceModelVersion)
+    }
+  }
+  let notes = [AskNote(text: "Slept longer with the fluffy blanket over him.", category: "sleep",
+                       createdAt: Date().addingTimeInterval(-86_400))]
+  let answer = await HybridAsk(model: OneWord()).answer(question: "How can I help him sleep longer?",
+                                                        child: AskChild(name: "Leo", ageMonths: 8), notes: notes,
+                                                        route: .onDeviceOnly)
+  #expect(answer.outcome == .floor(.unsafeTip))
 }
