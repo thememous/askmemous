@@ -224,6 +224,54 @@ public enum AskCheck {
     }
   }
 
+  // MARK: - What the app reads in a note
+
+  /// What the checks read in one note, for showing it to the parent. Uses the
+  /// same rules as `canSupportATip`, `decidingPart`, the day reading and
+  /// `review`'s choice of tip, and changes none of them. No model.
+  public struct NoteReading: Sendable, Equatable {
+    /// Whether Ask could build a tip on this note: it passes the tip filter and
+    /// `review` would have a tip to give (a harder day where something was done has none).
+    public var canBackATip: Bool { tip != nil }
+    /// The tip `review` would write from this note, if the model points to its cause.
+    public let tip: TipAction?
+    /// How the day went, from the deciding part's own words.
+    public let day: DayWas
+    /// The word that says so ("Slept", "Fussier"), when there is one.
+    public let clue: String?
+    /// What was different that day, in the note's own words, from the first link
+    /// word to the end of its clause ("skipped the late snack", "after the park").
+    /// Nil when the note can't back a tip.
+    public let cause: String?
+  }
+
+  public static func readNote(_ text: String) -> NoteReading {
+    let none = NoteReading(tip: nil, day: .unclear, clue: nil, cause: nil)
+    guard canSupportATip(text), let part = decidingPart(text), let cause = causeClause(in: part) else { return none }
+    let read = reading(part)
+    // The same choice as `review`: a silent note counts as a better day it doesn't
+    // claim, and can't back leaving something out.
+    let leftOut = tokens(cause).contains(where: leftOutWords.contains)
+    let stated = read == .better || read == .worse
+    guard stated || !leftOut, let tip = action(day: read == .worse ? .worse : .better, leftOut: leftOut) else { return none }
+    return NoteReading(tip: tip, day: dayFromWording(part),
+                       clue: stated ? clueWord(in: part, for: read) : nil, cause: cause)
+  }
+
+  /// From the first link or liking word to the end of its clause, at most 14 words.
+  static func causeClause(in part: String) -> String? {
+    let words = part.split(whereSeparator: \.isWhitespace).map(String.init)
+    guard let start = words.firstIndex(where: { w in
+      tokens(w).contains { linkWords.contains($0) || preferenceWords.contains($0) }
+    }) else { return nil }
+    var end = start
+    let ends: (String) -> Bool = { $0.hasSuffix(",") || $0.hasSuffix(";") || $0.hasSuffix(".") }
+    while end < words.count - 1, !ends(words[end]) { end += 1 }
+    let picked = words[start...end].prefix(14).joined(separator: " ")
+    let trimmed = picked.trimmingCharacters(in: CharacterSet(charactersIn: ",;.!?"))
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
   // MARK: - Why this note
 
   /// "Why this note?", answered by the app from the note's own words. No model.

@@ -86,6 +86,12 @@ out, so every follow-up runs the same checked path. "Why this note?" is answered
 by the app from the note's own words, with no model. When no unused note can
 back a tip, the app says so. The eval has eight such conversations (see below).
 
+**Notes show what the app reads.** On the Notes screen, the part of each note
+the checks use is highlighted ("Slept to 6:40 on the day we **skipped the late
+snack**"), with whether that day went better or worse. Tap a note to see what
+tip it could back, or why it can't back one. The same code that checks answers
+reads the notes; no model is involved.
+
 The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 `AskModel` protocol. `HybridAskFirebase` is the Firebase AI Logic version.
 
@@ -107,7 +113,7 @@ The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 ## Repository
 
 ```
-AskMemoUS/                     SwiftUI app: Notes, Ask, Your questions, Settings, Eval runner
+AskMemoUS/                     SwiftUI app: Ask, Notes, Your questions, Settings, Eval runner
 AskMemoUS/Mascot.xcassets/     Memo, the MemoUS mascot (not open-licensed, see MASCOT-LICENSE.md)
 AskMemoUS/TabIcons.xcassets/   The tab icons, MemoUS art (not open-licensed, see MASCOT-LICENSE.md)
 Packages/HybridAskCore/        Gates, note filter, prompt, checks, tip text, eval cases and runner

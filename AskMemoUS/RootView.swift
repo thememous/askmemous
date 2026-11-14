@@ -4,7 +4,8 @@ import SwiftData
 struct RootView: View {
   @Environment(\.modelContext) private var context
   @Query private var children: [Child]
-  @State private var tab = TabID.notes
+  /// Ask opens first: it's what the app is for. Notes is the evidence it reads.
+  @State private var tab = TabID.ask
 
   /// The tab icons (TabIcons.xcassets) are drawn like MemoUS's: one pen line, round
   /// nodes and the four-point star. The selected tab lights its star or nodes gold.
@@ -18,8 +19,8 @@ struct RootView: View {
     Group {
       if let child = children.first {
         TabView(selection: $tab) {
-          Tab("Notes", image: icon(.notes), value: .notes) { NotesView(child: child) }
           Tab("Ask", image: icon(.ask), value: .ask) { AskView(child: child) }
+          Tab("Notes", image: icon(.notes), value: .notes) { NotesView(child: child) }
           Tab("Your questions", image: icon(.questions), value: .questions) { QuestionsView(child: child) }
           Tab("Settings", image: icon(.settings), value: .settings) { SettingsView(child: child) }
         }

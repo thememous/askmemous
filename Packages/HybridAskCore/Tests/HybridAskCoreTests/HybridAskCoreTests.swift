@@ -568,3 +568,40 @@ private func tipText(_ outcome: AskOutcome) -> String? {
                                                         route: .onDeviceOnly)
   #expect(answer.outcome == .floor(.unsafeTip))
 }
+
+// MARK: - What the Notes screen shows
+
+@Test func readNoteShowsWhatWasDifferentAndHowTheDayWent() {
+  let snack = AskCheck.readNote("Slept to 6:40 on the day we skipped the late snack.")
+  #expect(snack == .init(tip: .leaveOut, day: .better, clue: "slept to", cause: "skipped the late snack"))
+
+  let nap = AskCheck.readNote("Fussier all evening on the day she missed the afternoon nap.")
+  #expect(nap.day == .worse)
+  #expect(nap.clue == "Fussier")
+  #expect(nap.cause == "missed the afternoon nap")
+  #expect(nap.tip == .keepIt)
+
+  let park = AskCheck.readNote("Long nap 12–2:30 after the park.")
+  #expect(park.canBackATip)
+  #expect(park.day == .unclear)
+  #expect(park.cause == "after the park")
+  #expect(park.tip == .repeatIt)
+
+  // A harder day where something was done: the filter lets the model see it, but
+  // `review` has no tip to give, so the Notes screen doesn't promise one.
+  let tv = AskCheck.readNote("Cried at bedtime after we watched the tablet.")
+  #expect(AskCheck.canSupportATip("Cried at bedtime after we watched the tablet."))
+  #expect(!tv.canBackATip)
+}
+
+@Test func readNoteAgreesWithTheTipFilter() {
+  for text in ["Up at 5:10 again, happy and chatty in the cot.", "Pointed at the dog and said “da” three times.",
+               "Settled in ten minutes with the room dark and the white noise on.",
+               "Upset after the dentist, calm again once we read his book."] {
+    let r = AskCheck.readNote(text)
+    #expect(!r.canBackATip || AskCheck.canSupportATip(text), "\(text)")
+    #expect((r.cause != nil) == r.canBackATip, "\(text)")
+  }
+  // A turning note: only the part after the turn is read.
+  #expect(AskCheck.readNote("Upset after the dentist, calm again once we read his book.").cause == "once we read his book")
+}
