@@ -136,3 +136,13 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
   let tv = AskNote(text: "Calm when we gave a five minute warning before the TV went off.", createdAt: Date())
   #expect(AskCheck.isRelevant(question: "Turning off screens is a battle.", note: tv))
 }
+
+@Test func aQuestionThatTurnsWithButIsAboutThePartAfterIt() {
+  let teeth = AskNote(text: "Happy to brush teeth with the timer song.", category: "care", createdAt: Date())
+  let meals = AskNote(text: "Ate more at dinner when we turned the music off.", category: "food", createdAt: Date())
+  let q = "Teeth are fine but dinner is a battle. What could I try?"
+  #expect(!AskCheck.isRelevant(question: q, note: teeth))
+  #expect(AskCheck.isRelevant(question: q, note: meals))
+  // A "but" with no topic after it keeps the whole question.
+  #expect(AskCheck.isRelevant(question: "Dinner is a battle but I am not sure.", note: meals))
+}

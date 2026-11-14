@@ -164,3 +164,12 @@ points" has one wrong tip left: n12 ("Bath time is fun but bedtime takes ages")
 picked the bath note, which now shares the new "care" topic with the question.
 The rest are Apple guardrail refusals on device (h16, h23, h25, n18, n31) and
 h20, where the model copied words not in the note, so the app gave no tip.
+
+## 2026-11-14 · Topic check reads the part after "but" (after seeing n12)
+
+"Bath time is fun but bedtime takes ages" named both care and sleep, so the
+bath note passed the topic check. When a question turns with "but" and the
+part after the last "but" names a topic, only that part counts now. Checked
+over all 63 cases: n12 is the only question with "but"; the bath note is now
+refused and the sleep note still passes. No other case's expected note is
+refused.

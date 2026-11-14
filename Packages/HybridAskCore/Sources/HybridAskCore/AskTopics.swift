@@ -47,8 +47,20 @@ extension AskCheck {
   /// counts as evidence: a tip can always borrow the question's words.
   /// A question with no recognised topic can't be judged here, so it passes.
   public static func isRelevant(question: String, note: AskNote) -> Bool {
-    let asked = AskTopic.of(question)
+    let asked = askedTopics(question)
     guard !asked.isEmpty else { return true }
     return !asked.isDisjoint(with: AskTopic.of(note))
+  }
+
+  /// The topics a question asks about. "Bath time is fun but bedtime takes
+  /// ages" asks about bedtime: when a question turns with "but" and the part
+  /// after the last "but" names a topic, only that part counts (n12, 2026-11-14).
+  public static func askedTopics(_ question: String) -> Set<AskTopic> {
+    let lower = question.lowercased()
+    if let turn = lower.range(of: " but ", options: .backwards) {
+      let after = AskTopic.of(String(lower[turn.upperBound...]))
+      if !after.isEmpty { return after }
+    }
+    return AskTopic.of(question)
   }
 }
