@@ -32,7 +32,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.memous.hybridask
-        DEVELOPMENT_TEAM: ${ASKMEMOUS_TEAM}
+        DEVELOPMENT_TEAM: ${ASKMEMOUS_TEAM} # your Apple Team ID, from the environment (see README)
         CODE_SIGN_STYLE: Automatic
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"

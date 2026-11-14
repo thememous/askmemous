@@ -128,12 +128,12 @@ Steps:
 1. Add an iOS app to your Firebase project and download its
    `GoogleService-Info.plist` into `AskMemoUS/`. It is gitignored. Never commit
    it.
-2. In `project.yml`, set `PRODUCT_BUNDLE_IDENTIFIER` to your app's bundle id
-   and `DEVELOPMENT_TEAM` to your own team.
-3. Generate the project and open it:
+2. In `project.yml`, set `PRODUCT_BUNDLE_IDENTIFIER` to your app's bundle id.
+3. Generate the project with your Apple Team ID and open it (or leave the ID
+   out and pick your team under Signing & Capabilities in Xcode):
 
    ```bash
-   xcodegen generate && open AskMemoUS.xcodeproj
+   ASKMEMOUS_TEAM=YOURTEAMID xcodegen generate && open AskMemoUS.xcodeproj
    ```
 
 4. Run on your iPhone. In **Settings → App Check (debug)**, tap **Get App Check
