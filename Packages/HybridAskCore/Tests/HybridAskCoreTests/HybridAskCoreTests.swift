@@ -605,3 +605,57 @@ private func tipText(_ outcome: AskOutcome) -> String? {
   // A turning note: only the part after the turn is read.
   #expect(AskCheck.readNote("Upset after the dentist, calm again once we read his book.").cause == "once we read his book")
 }
+
+// MARK: - Tip wording: the pattern behind "without late snack" (2026-11-14)
+
+/// The tip for a copy, the way `review` writes it.
+private func tip(copying copy: String, from note: String) -> String? {
+  guard let found = AskCheck.locate(copy, in: note) else { return nil }
+  let read = AskCheck.reading(note)
+  let stated = read == .better || read == .worse
+  guard let action = AskCheck.action(day: read == .worse ? .worse : .better, leftOut: found.leftOut) else { return nil }
+  return TipText.compose(action: action, object: found.span, dayStated: stated, leftOut: found.leftOut, note: note)
+}
+
+@Test func aLeftOutThingKeepsTheNotesArticle() {
+  let snack = "Slept to 6:40 on the day we skipped the late snack."
+  #expect(tip(copying: "late snack", from: snack)?.contains("without the late snack.") == true)
+  #expect(tip(copying: "skipped the late snack", from: snack)?.contains("without the late snack.") == true)
+  let nap = "Fussy all afternoon on the day we skipped the morning nap."
+  #expect(tip(copying: "morning nap", from: nap) == "Your note says the day without the morning nap was harder. Try keeping it in this week.")
+  // "skipped the" stops before the thing: nothing to point at.
+  #expect(AskCheck.locate("skipped the", in: snack) == nil)
+}
+
+@Test func crying_thatStoppedOrDidntHappen_isABetterDay_andLeavesNothingOut() {
+  let coat = "No crying in the car seat when he kept his puffy coat on."
+  let seat = "Stopped crying when we turned the car seat to face forward."
+  let dark = "Went down at 7 without crying when we kept the room dark and quiet after dinner."
+  for note in [coat, seat, dark] {
+    #expect(AskCheck.dayFromWording(note) == .better, "\(note)")
+    #expect(AskCheck.readNote(note).tip == .repeatIt, "\(note)")
+  }
+  #expect(AskCheck.locate("we kept the room dark", in: dark)?.leftOut == false)
+  #expect(AskCheck.locate("No crying in the car seat", in: coat)?.leftOut == false)
+  #expect(tip(copying: "we turned the car seat to face forward", from: seat)
+          == "Your note says things went better when you turned the car seat to face forward. Try that again this week.")
+  #expect(AskCheck.readNote(dark).cause == "when we kept the room dark and quiet after dinner")
+  // On its own, "Went down without crying" links nothing.
+  #expect(!AskCheck.canSupportATip("Went down without crying."))
+}
+
+@Test func aCopyThatStopsMidClauseNamesTheWholeClause() {
+  let hood = "Stayed asleep when we carried her in with the hood up and lights off."
+  #expect(tip(copying: "when we carried her in", from: hood)
+          == "Your note says things went better when you carried her in with the hood up and lights off. Try that again this week.")
+  #expect(tip(copying: "kept the room dark and", from: "Went down at 7 without crying when we kept the room dark and quiet after dinner.")?
+            .contains("when you kept the room dark and quiet after dinner.") == true)
+}
+
+@Test func aCopyStartingAtATimeOrAPossessiveNamesTheCause() {
+  #expect(tip(copying: "6:40 on the day we skipped the late snack", from: "Slept to 6:40 on the day we skipped the late snack.")?
+            .hasPrefix("Your note says things went better on the day without the late snack.") == true)
+  #expect(tip(copying: "three songs", from: "Settled quickly when we did the same three songs.")?
+            .hasPrefix("Try the same three songs again") == true)
+  #expect(tip(copying: "evening at grandma's", from: "Up at 9pm after a busy evening at grandma's.")?.hasPrefix("Try evening") != true)
+}

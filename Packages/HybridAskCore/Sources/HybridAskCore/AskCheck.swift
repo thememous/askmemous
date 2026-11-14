@@ -67,7 +67,14 @@ public enum AskCheck {
   /// happy and chatty" links nothing, so the model never sees it as a choice.
   public static func canSupportATip(_ text: String) -> Bool {
     guard let part = decidingPart(text) else { return false }
-    return tokens(part).contains { linkWords.contains($0) || preferenceWords.contains($0) }
+    let toks = tokens(part)
+    return toks.indices.contains { isLink(toks, at: $0) || preferenceWords.contains(toks[$0]) }
+  }
+
+  /// A link word, except "no", "stopped" or "without" before crying or fussing:
+  /// "No crying in the car seat" says how the day went and links nothing.
+  static func isLink(_ toks: [String], at i: Int) -> Bool {
+    linkWords.contains(toks[i]) && !negatesDistress(toks, at: i)
   }
 
   /// The part of a note that says how things went. Usually the whole note. A
@@ -99,13 +106,31 @@ public enum AskCheck {
   static let leftOutWords: Set<String> = ["skipped", "skip", "skipping", "without", "no", "stopped",
                                           "dropped", "missed", "forgot", "cut"]
 
+  /// Crying and fussing. After "no", "stopped" or "without" they say the day went
+  /// better ("No crying in the car seat", "Stopped crying when we turned the seat"),
+  /// and nothing was left out. Added 2026-11-14 (see docs/EVAL_LOG.md).
+  static let distressWords: Set<String> = ["crying", "cry", "cried", "fussing", "fuss", "fussed", "tears",
+                                           "tantrum", "tantrums", "meltdown", "meltdowns", "screaming",
+                                           "screamed", "whining", "whinging"]
+
+  /// "no crying", "stopped fussing", "without tears".
+  static func negatesDistress(_ toks: [String], at i: Int) -> Bool {
+    leftOutWords.contains(toks[i]) && i + 1 < toks.count && distressWords.contains(toks[i + 1])
+  }
+
+  /// A left-out word that really leaves something out ("skipped the snack"), not
+  /// one that says the crying stopped.
+  static func marksLeftOut(_ toks: [String], at i: Int) -> Bool {
+    leftOutWords.contains(toks[i]) && !negatesDistress(toks, at: i)
+  }
+
   /// Finds the object in the note: at least 80% of its words, in order, with at
   /// most two other words between matches. Returns the note's own text for that
   /// stretch and whether it was left out that day.
   public static func locate(_ object: String, in noteText: String) -> (span: String, leftOut: Bool)? {
     var obj = tokens(object)
     var markedLeftOut = false
-    while let first = obj.first, leftOutWords.contains(first) {
+    while !obj.isEmpty, marksLeftOut(obj, at: 0) {
       markedLeftOut = true
       obj.removeFirst()
     }
@@ -147,20 +172,26 @@ public enum AskCheck {
           !tokens(original[firstWord]).contains(where: leftOutWords.contains) {
       firstWord += 1
     }
+    let allTokens = noteTokens.map(\.token)
+    /// Whether a word of the note leaves something out (its token, read with the next one).
+    func leavesOut(_ w: Int) -> Bool {
+      noteTokens.indices.contains { noteTokens[$0].word == w && marksLeftOut(allTokens, at: $0) }
+    }
     // "fed and fell asleep with": the copy stopped before the thing itself.
     if tokens(original[lastWord]).allSatisfy(linkWords.contains) { return nil }
     // "the day we skipped the late snack": the thing is what comes after "skipped".
     var leftOutInside = false
-    if let cut = (firstWord...lastWord).last(where: { w in tokens(original[w]).contains(where: leftOutWords.contains) }),
-       cut < lastWord {
+    if let cut = (firstWord...lastWord).last(where: leavesOut), cut < lastWord {
       firstWord = cut + 1
       leftOutInside = true
     }
     let span = original[firstWord...lastWord]
       .joined(separator: " ")
       .trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
-    let before = noteTokens[max(0, best.first - 3)..<best.first].map(\.token)
-    return (span, markedLeftOut || leftOutInside || before.contains(where: leftOutWords.contains))
+    // "skipped the": the copy stopped before the thing itself.
+    if tokens(span).allSatisfy({ TipText.determiners.contains($0) || TipText.subjects.contains($0) }) { return nil }
+    let leftOutBefore = (max(0, best.first - 3)..<best.first).contains { marksLeftOut(allTokens, at: $0) }
+    return (span, markedLeftOut || leftOutInside || leftOutBefore)
   }
 
   /// The clause of the note around a single copied word: from the nearest link word
@@ -187,7 +218,11 @@ public enum AskCheck {
   // MARK: - Better or worse day, from the note's own words
 
   static let betterPhrases = ["didn t cry", "without crying", "no tears", "didn t fuss", "stayed asleep",
-                              "went down easier", "slept to", "slept longer", "slept through"]
+                              "went down easier", "slept to", "slept longer", "slept through",
+                              // Added 2026-11-14: crying that stopped or didn't happen is a better day.
+                              "no crying", "stopped crying", "no fuss", "no fussing", "stopped fussing",
+                              "without fussing", "without a fuss", "no tantrum", "no meltdown",
+                              "no screaming", "stopped screaming"]
   static let betterWords: Set<String> = ["slept", "settled", "calm", "calmer", "happy", "happier", "easier",
                                          "easy", "fine", "smooth", "finished", "shared", "laughed", "loved",
                                          "longer", "better", "relaxed", "content", "quickly"]
@@ -251,7 +286,8 @@ public enum AskCheck {
     let read = reading(part)
     // The same choice as `review`: a silent note counts as a better day it doesn't
     // claim, and can't back leaving something out.
-    let leftOut = tokens(cause).contains(where: leftOutWords.contains)
+    let causeTokens = tokens(cause)
+    let leftOut = causeTokens.indices.contains { marksLeftOut(causeTokens, at: $0) }
     let stated = read == .better || read == .worse
     guard stated || !leftOut, let tip = action(day: read == .worse ? .worse : .better, leftOut: leftOut) else { return none }
     return NoteReading(tip: tip, day: dayFromWording(part),
@@ -261,8 +297,9 @@ public enum AskCheck {
   /// From the first link or liking word to the end of its clause, at most 14 words.
   static func causeClause(in part: String) -> String? {
     let words = part.split(whereSeparator: \.isWhitespace).map(String.init)
-    guard let start = words.firstIndex(where: { w in
-      tokens(w).contains { linkWords.contains($0) || preferenceWords.contains($0) }
+    let toks = words.map { tokens($0).first ?? "" }
+    guard let start = words.indices.first(where: { i in
+      isLink(toks, at: i) || preferenceWords.contains(toks[i])
     }) else { return nil }
     var end = start
     let ends: (String) -> Bool = { $0.hasSuffix(",") || $0.hasSuffix(";") || $0.hasSuffix(".") }
@@ -353,6 +390,16 @@ public enum TipText {
   /// Words that start the cause only at its start: "with the room dark", "at the kitchen table".
   static let placeLinks: Set<String> = ["with", "at", "in", "on"]
   static let subjects: Set<String> = ["we", "i", "she", "he", "they", "you", "your"]
+  /// Links that start an action of their own ("when we sat at the table"), unlike
+  /// "after dinner", which only says when.
+  static let actionLinks: Set<String> = ["when", "once", "because", "since", "if"]
+  /// Words ending in "ing" that name a time or a thing, not something done.
+  static let ingNouns: Set<String> = ["evening", "morning", "thing", "something", "nothing", "everything",
+                                      "string", "spring", "ceiling", "pudding", "wedding", "building"]
+  /// Words a cause can't end on: "kept the room dark and", "turned the car seat to".
+  /// ("on", "in", "you" can end one: "the white noise on", "at the table with you".)
+  static let dangling: Set<String> = ["and", "or", "but", "to", "of", "the", "a", "an", "his", "her", "their",
+                                      "your", "for", "from", "when", "after", "with", "by"]
   static let toParent: [String: String] = ["we": "you", "i": "you", "us": "you", "our": "your",
                                            "my": "your", "me": "you"]
 
@@ -364,8 +411,12 @@ public enum TipText {
     guard let note, let r = note.range(of: span, options: .caseInsensitive) else { return span }
     var before = note[..<r.lowerBound].split(whereSeparator: \.isWhitespace).map(String.init)
     var lead: [String] = []
-    if let w = before.last, !w.hasSuffix(","), !w.hasSuffix(";"), !w.hasSuffix("."),
-       determiners.contains(bare(w)) || subjects.contains(bare(w)) {
+    func open(_ w: String) -> Bool { !w.hasSuffix(",") && !w.hasSuffix(";") && !w.hasSuffix(".") }
+    // "three songs" is "the same three songs" in the note: take every small word back.
+    while lead.count < 3, let w = before.last, open(w), determiners.contains(bare(w)) {
+      lead.insert(w, at: 0); before.removeLast()
+    }
+    if lead.isEmpty, let w = before.last, open(w), subjects.contains(bare(w)) {
       lead.insert(w, at: 0); before.removeLast()
     }
     if let w = before.last, !w.hasSuffix(","), !w.hasSuffix(";"), !w.hasSuffix("."),
@@ -381,8 +432,37 @@ public enum TipText {
 
   /// The cause named in the copied words. `nil` when the words only say what
   /// happened ("Slept to 6:40").
+  /// A left-out thing keeps the note's own article: the model may copy "late
+  /// snack" from "skipped the late snack". Added 2026-11-14.
+  static func withArticle(_ span: String, in note: String?) -> String {
+    guard let note, let first = span.split(separator: " ").first.map({ bare(String($0)) }),
+          !determiners.contains(first),
+          let r = note.range(of: span, options: .caseInsensitive),
+          let w = note[..<r.lowerBound].split(whereSeparator: \.isWhitespace).last.map(String.init),
+          determiners.contains(bare(w)) else { return span }
+    return w + " " + span
+  }
+
+  /// A copy that stops mid-clause ("when we carried her in") runs on to the end of
+  /// the note's own clause, so the tip never names half a thing. At most 14 words.
+  /// Added 2026-11-14.
+  static func toClauseEnd(_ text: String, in note: String?) -> String {
+    guard let note, let r = note.range(of: text, options: .caseInsensitive) else { return text }
+    var words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+    if let last = words.last, last.hasSuffix(",") || last.hasSuffix(";") || last.hasSuffix(".") { return text }
+    let next = note[r.upperBound...]
+    if let c = next.first, !c.isWhitespace { return text } // the copy ends inside a word
+    for w in next.split(whereSeparator: \.isWhitespace).map(String.init) {
+      guard words.count < 14 else { break }
+      words.append(w)
+      if w.hasSuffix(",") || w.hasSuffix(";") || w.hasSuffix(".") || w.hasSuffix("!") { break }
+    }
+    return words.joined(separator: " ")
+  }
+
   static func cause(in span: String, leftOut: Bool, note: String?) -> Cause? {
-    var words = (leftOut ? span : widened(span, in: note)).split(whereSeparator: \.isWhitespace).map(String.init)
+    let start = leftOut ? withArticle(span, in: note) : widened(span, in: note)
+    var words = toClauseEnd(start, in: note).split(whereSeparator: \.isWhitespace).map(String.init)
     // Stop at the first comma or semicolon: "the crinkly book, kept grabbing the pages".
     if let cut = words.firstIndex(where: { $0.hasSuffix(",") || $0.hasSuffix(";") }) {
       words = Array(words[...cut])
@@ -395,22 +475,45 @@ public enum TipText {
       }
       .joined(separator: " ")
       .trimmingCharacters(in: CharacterSet.punctuationCharacters.union(.whitespaces))
-      return t.isEmpty ? nil : t
+      // A copy cut mid-phrase ("kept the room dark and"): drop the dangling words.
+      var parts = t.split(separator: " ").map(String.init)
+      while let last = parts.last.map(bare), dangling.contains(last) {
+        parts.removeLast()
+      }
+      return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
     guard let first = words.first.map(bare) else { return nil }
     if leftOut { return tidy(words[...]).map(Cause.plain) }
     if AskCheck.preferenceWords.contains(first) {
       return tidy(words.dropFirst()).map { .liked(verb: first, thing: $0) }
     }
+    // "at 7 without crying when we kept the room dark": the cause is the "when" clause.
+    if placeLinks.contains(first), let later = words.dropFirst().firstIndex(where: { clauseLinks.contains(bare($0)) }),
+       later + 1 < words.count {
+      return tidy(words[(later + 1)...]).map { .linked(link: bare(words[later]), thing: $0) }
+    }
     if clauseLinks.contains(first) || placeLinks.contains(first) {
       return tidy(words.dropFirst()).map { .linked(link: first, thing: $0) }
+    }
+    // A copy that starts at a time or an amount names the result, not the cause:
+    // "6:40 on the day you skipped the late snack", "12–2:30 after the park".
+    // The cause is the clause after it. Added 2026-11-14.
+    if first.first?.isNumber == true,
+       let at = words.dropFirst().firstIndex(where: { clauseLinks.contains(bare($0)) || placeLinks.contains(bare($0)) }),
+       at + 1 < words.count {
+      return tidy(words[(at + 1)...]).map { .linked(link: bare(words[at]), thing: $0) }
+    }
+    // "her peas when they were on the blue plate": the "when" clause is the cause.
+    if determiners.contains(first) || first.hasSuffix("ing"),
+       let at = words.dropFirst().firstIndex(where: { actionLinks.contains(bare($0)) }), at + 1 < words.count {
+      return tidy(words[(at + 1)...]).map { .linked(link: bare(words[at]), thing: $0) }
     }
     if determiners.contains(first) || first.first?.isNumber == true {
       return tidy(words[...]).map(Cause.plain)
     }
     let at0 = words.firstIndex { clauseLinks.contains(bare($0)) }
-    // "splashing in the washing-up bowl" names the thing itself.
-    if at0 == nil, first.hasSuffix("ing"), first.count > 4 {
+    // "splashing in the washing-up bowl" names the thing itself ("evening" doesn't).
+    if at0 == nil, first.hasSuffix("ing"), first.count > 4, !ingNouns.contains(first) {
       return tidy(words[...]).map(Cause.plain)
     }
     let at = words.firstIndex { clauseLinks.contains(bare($0)) } ?? words.firstIndex { bare($0) == "with" }

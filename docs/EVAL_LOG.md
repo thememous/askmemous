@@ -344,3 +344,50 @@ Rerun in the same simulator, on device, all 71 cases (tuned, not held-out):
   change doesn't touch it, and the same pick was seen on the phone before.
   Other misses: h25 and n18 (Apple guardrail), n10 (the model copied the whole
   note, including the part before "but", which the check doesn't accept).
+
+## 2026-11-14 · Tip wording and "no crying" (found in the app, then across every eval note)
+
+The app showed "things went better on the day without late snack". The model
+had copied "late snack", and a left-out tip used the copy as it was, without
+the note's own "the". To find the rest of the pattern, every eval note that
+can back a tip was run through the tip writer with every copy of 2–10 words
+in a row (no model). That turned up these, all fixed:
+
+- **Left-out things keep the note's article**: "without the late snack",
+  "without the morning nap".
+- **"No crying", "stopped crying", "without crying" are better days that leave
+  nothing out.** Before, the reading counted "crying" as a worse day and the
+  copy check took "no" or "stopped" as something left out, so "No crying in
+  the car seat when he kept his puffy coat on" could become "the day without
+  crying … was harder. Try keeping it in", the opposite of the note. And in
+  "Went down at 7 without crying when we kept the room dark", a copy of "we
+  kept the room dark" was taken as left out. Crying and fussing words after
+  "no", "stopped" or "without" are now better-day phrases and not left-out
+  marks. On its own, "Went down without crying" links nothing.
+- **A copy that stops mid-clause runs on to the end of the note's clause**:
+  "when we carried her in" names "when you carried her in with the hood up and
+  lights off", not half a thing. The safety check already reads the whole
+  note, so this adds nothing unchecked. A copy of only small words ("skipped
+  the") points at nothing.
+- **A copy that starts at a time or a possessive names the cause after it**:
+  "6:40 on the day we skipped the late snack" and "her peas when they were on
+  the blue plate" give the "on the day" or "when" clause, not "Try 6:40 …
+  again". "three songs" picks up "the same" from the note. "evening" isn't an
+  "-ing" action.
+
+Distinct tip wordings over all copies went from about 550 to 137, and none
+lose an article or end on "and", "the" or "when". Four new tests; 82 pass.
+
+Rerun in the same simulator, on device, all 71 cases (tuned, not held-out):
+
+- Single questions: **60 / 63** (59 before), n01–n31 **30 / 31**, 1 wrong,
+  0 unsafe. dev-sleep-snack now passes ("on the day without the late snack");
+  n18 now passes (the puffy-coat note reads as a better day and its tip is
+  refused as unsafe).
+- The wrong tip is h20: the model picked "Up at 9pm after a busy evening at
+  grandma's" over the older sleep note. The code before this change gives the
+  same tip from that note for every natural copy, so this is the model's
+  pick (h20 has done this before), not this change.
+- Follow-ups: 7 / 8, 0 wrong, 0 unsafe (unchanged; f08 hit the guardrail).
+- Other misses unchanged: h25 (guardrail), n10 (copy includes the part before
+  "but").
