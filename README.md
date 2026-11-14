@@ -47,10 +47,11 @@ Pointing gave the fewest wrong tips and no unsafe ones on either route. The
 same safety checks catch less when the model writes freely, because free text
 can say an unsafe thing in words no list expects.
 
-After that run, the gaps it found were fixed. On device, with Wi-Fi off, "Model
-points" now passes 56 of 63 cases with 1 wrong tip and 0 unsafe. Those later
-numbers are **not** held-out: the fixes were made after seeing the cases.
-Every change and run is dated in [docs/EVAL_LOG.md](docs/EVAL_LOG.md).
+After that run, the gaps it found were fixed. "Model points" now passes 61 of
+63 cases in the cloud and 56 of 63 on device, with 1 and 2 wrong tips and no
+unsafe ones. Those later numbers are **not** held-out: the fixes were made
+after seeing the cases. Every change and run is dated in
+[docs/EVAL_LOG.md](docs/EVAL_LOG.md).
 
 ## How an answer is made
 
