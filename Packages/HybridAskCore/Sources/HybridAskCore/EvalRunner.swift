@@ -39,10 +39,35 @@ public struct EvalCaseResult: Codable, Sendable, Identifiable, Hashable {
   /// A tip reached the parent (right or wrong).
   public let gaveTip: Bool?
 
+  /// For follow-up cases: some step showed a tip the case says is wrong.
+  public let wrongTipShown: Bool?
+  /// For follow-up cases: how many answers were asked (the first plus follow-ups).
+  public let steps: Int?
+
+  public init(id: String, split: String, passed: Bool, unsafe: Bool, grade: String, shown: String,
+              source: AnswerSource, escalated: Bool, seconds: Double, modelDetail: String?,
+              expected: String?, gaveTip: Bool?, wrongTipShown: Bool? = nil, steps: Int? = nil) {
+    self.id = id
+    self.split = split
+    self.passed = passed
+    self.unsafe = unsafe
+    self.grade = grade
+    self.shown = shown
+    self.source = source
+    self.escalated = escalated
+    self.seconds = seconds
+    self.modelDetail = modelDetail
+    self.expected = expected
+    self.gaveTip = gaveTip
+    self.wrongTipShown = wrongTipShown
+    self.steps = steps
+  }
+
+  public var isFollowUp: Bool { split == EvalCase.followUpSplit }
   /// The case needed a tip and got the right one.
   public var rightTip: Bool { expected == "tip" && passed }
   /// A tip was shown that the case says is wrong (wrong note, unsafe, or no tip wanted).
-  public var wrongTip: Bool { gaveTip == true && !passed }
+  public var wrongTip: Bool { wrongTipShown ?? (gaveTip == true && !passed) }
 }
 
 public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
@@ -68,23 +93,37 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
   public var id: String { "\(variant.rawValue)|\(isReference == true ? "never" : route.rawValue)" }
   public var routeTitle: String { isReference == true ? "Never gives a tip" : route.rawValue }
 
-  public var total: Int { results.count }
-  public var passed: Int { results.filter(\.passed).count }
-  public var heldoutTotal: Int { results.filter { $0.split == "heldout" }.count }
-  public var heldoutPassed: Int { results.filter { $0.split == "heldout" && $0.passed }.count }
-  public var unsafe: Int { results.filter(\.unsafe).count }
+  /// Single-question cases. The main numbers count only these, so they stay
+  /// comparable with runs from before follow-ups were added.
+  public var single: [EvalCaseResult] { results.filter { !$0.isFollowUp } }
+  public var followUps: [EvalCaseResult] { results.filter(\.isFollowUp) }
+
+  public var total: Int { single.count }
+  public var passed: Int { single.filter(\.passed).count }
+  public var heldoutTotal: Int { single.filter { $0.split == "heldout" }.count }
+  public var heldoutPassed: Int { single.filter { $0.split == "heldout" && $0.passed }.count }
+  public var unsafe: Int { single.filter(\.unsafe).count }
   /// Cases that need a tip (expected outcome "tip").
-  public var tipCases: Int { results.filter { $0.expected == "tip" }.count }
-  public var rightTips: Int { results.filter(\.rightTip).count }
-  public var wrongTips: Int { results.filter(\.wrongTip).count }
+  public var tipCases: Int { single.filter { $0.expected == "tip" }.count }
+  public var rightTips: Int { single.filter(\.rightTip).count }
+  public var wrongTips: Int { single.filter(\.wrongTip).count }
   /// False for reports saved before right/wrong tips were recorded.
   public var hasTipCounts: Bool { results.allSatisfy { $0.expected != nil } }
-  public var onDevice: Int { results.filter { $0.source == .onDevice }.count }
-  public var cloud: Int { results.filter { $0.source == .cloud }.count }
+
+  /// Follow-up conversations that passed at every step.
+  public var followUpPassed: Int { followUps.filter(\.passed).count }
+  public var followUpWrong: Int { followUps.filter(\.wrongTip).count }
+  public var followUpUnsafe: Int { followUps.filter(\.unsafe).count }
+  public var followUpText: String {
+    followUps.isEmpty ? "–" : "\(followUpPassed)/\(followUps.count) · \(followUpWrong) wrong · \(followUpUnsafe) unsafe"
+  }
+
+  public var onDevice: Int { single.filter { $0.source == .onDevice }.count }
+  public var cloud: Int { single.filter { $0.source == .cloud }.count }
   /// Answered by the app with no model call.
-  public var appOnly: Int { results.filter { $0.source == .app }.count }
+  public var appOnly: Int { single.filter { $0.source == .app }.count }
   public var meanModelSeconds: Double {
-    let timed = results.filter { $0.source != .app }
+    let timed = single.filter { $0.source != .app }
     return timed.isEmpty ? 0 : timed.map(\.seconds).reduce(0, +) / Double(timed.count)
   }
 
@@ -94,8 +133,8 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
   }
 
   public static let markdownHeader = """
-  | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | On device / cloud / app | Avg model s |
-  |---|---|---|---|---|---|---|---|---|
+  | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | Follow-ups | On device / cloud / app | Avg model s |
+  |---|---|---|---|---|---|---|---|---|---|
   """
 
   public var markdownRow: String {
@@ -103,7 +142,7 @@ public struct EvalReport: Codable, Sendable, Identifiable, Hashable {
     let tips = hasTipCounts ? "\(rightTips)/\(tipCases) | \(wrongTips)" : "– | –"
     let timing = isReference == true ? "– | –" : "\(onDevice) / \(cloud) / \(appOnly) | \(String(format: "%.1f", meanModelSeconds))"
     return "| \(variant.title) | \(routeTitle)\(partial) | \(passed)/\(total) | \(heldoutPassed)/\(heldoutTotal) | "
-      + "\(tips) | \(unsafe) | \(timing) |"
+      + "\(tips) | \(unsafe) | \(followUpText) | \(timing) |"
   }
 }
 
@@ -117,14 +156,17 @@ public struct EvalRunner: Sendable {
     self.writer = writer
   }
 
+  /// - Parameter used: notes already used in this conversation. Pointing leaves them out
+  ///   the way the app does; the writing variants simply don't see them.
   public func answer(_ c: EvalCase, notes: [AskNote], variant: AskVariant, route: AskRoute,
-                     cloudAllowed: Bool, now: Date) async -> AskAnswer {
+                     cloudAllowed: Bool, excluding used: Set<UUID> = [], now: Date) async -> AskAnswer {
     switch variant {
     case .modelPoints:
       await HybridAsk(model: pointer).answer(question: c.question, child: c.child, notes: notes,
-                                             route: route, cloudAllowed: cloudAllowed, now: now)
+                                             route: route, cloudAllowed: cloudAllowed, excluding: used, now: now)
     case .modelWrites, .modelWritesChecked:
-      await BaselineAsk(model: writer).answer(question: c.question, child: c.child, notes: notes, route: route,
+      await BaselineAsk(model: writer).answer(question: c.question, child: c.child,
+                                              notes: notes.filter { !used.contains($0.id) }, route: route,
                                               cloudAllowed: cloudAllowed, checked: variant == .modelWritesChecked,
                                               now: now)
     }
@@ -145,31 +187,82 @@ public struct EvalRunner: Sendable {
     var results: [EvalCaseResult] = []
     let clock = ContinuousClock()
     var lastModelCall: ContinuousClock.Instant?
-    for (index, c) in cases.enumerated() {
-      if Task.isCancelled { break }
-      await progress(index, cases.count)
+    var stopped = false
+    /// One answer, paced so cloud calls stay within the free tier. Nil if the run was stopped.
+    func ask(_ c: EvalCase, _ notes: [AskNote], used: Set<UUID>) async -> (AskAnswer, Double)? {
       if let lastModelCall, pace > .zero {
         let wait = pace - (clock.now - lastModelCall)
         if wait > .zero { try? await Task.sleep(for: wait) }
-        if Task.isCancelled { break }
       }
-      let built = c.askNotes(now: now)
+      if Task.isCancelled { return nil }
       let start = clock.now
-      let answer = await answer(c, notes: built.notes, variant: variant, route: route,
-                                cloudAllowed: cloudAllowed, now: now)
+      let answer = await answer(c, notes: notes, variant: variant, route: route,
+                                cloudAllowed: cloudAllowed, excluding: used, now: now)
       let elapsed = clock.now - start
       if answer.source != .app || answer.detail != nil { lastModelCall = clock.now }
-      let graded = c.grade(answer, caseIdFor: built.caseIdFor)
-      let shown: String, gaveTip: Bool
-      switch answer.outcome {
-      case let .tip(text, _): (shown, gaveTip) = (text, true)
-      case let .floor(reason): (shown, gaveTip) = ("[\(reason.rawValue)]", false)
+      return (answer, Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)
+    }
+    func shown(_ a: AskAnswer) -> String {
+      switch a.outcome {
+      case let .tip(text, _): text
+      case let .floor(reason): "[\(reason.rawValue)]"
       }
+    }
+
+    for (index, c) in cases.enumerated() {
+      if Task.isCancelled { break }
+      await progress(index, cases.count)
+      let built = c.askNotes(now: now)
+      guard let (answer, seconds) = await ask(c, built.notes, used: []) else { break }
+      let graded = c.grade(answer, caseIdFor: built.caseIdFor)
+      var gaveTip = false
+      if case .tip = answer.outcome { gaveTip = true }
+
+      guard let followUps = c.followUps, !followUps.isEmpty else {
+        results.append(EvalCaseResult(
+          id: c.id, split: c.split, passed: graded.passed, unsafe: graded.unsafe, grade: graded.detail,
+          shown: shown(answer), source: answer.source, escalated: answer.escalated, seconds: seconds,
+          modelDetail: answer.detail, expected: c.expect.outcome.rawValue, gaveTip: gaveTip
+        ))
+        continue
+      }
+
+      // A conversation: the first answer, then each follow-up while the last answer was a tip.
+      var passed = graded.passed, unsafe = graded.unsafe, wrongShown = gaveTip && !graded.passed
+      var grades = ["1: \(graded.detail)"], shownSteps = [shown(answer)]
+      var details = [answer.detail].compactMap { $0 }
+      var total = seconds, escalated = answer.escalated
+      var usedIds: Set<UUID> = [], usedCaseIds: Set<String> = []
+      var last = answer
+      for (step, followUp) in followUps.enumerated() {
+        guard case let .tip(_, note) = last.outcome else {
+          // No tip, so the app shows no follow-up buttons. Fine only if no tip was wanted.
+          grades.append("\(step + 2)–: no follow-ups (no tip to follow up)")
+          break
+        }
+        usedIds.insert(note.id)
+        if let id = built.caseIdFor[note.id] { usedCaseIds.insert(id) }
+        guard let (next, s) = await ask(c, built.notes, used: usedIds) else { stopped = true; break }
+        let g = c.grade(next, followUp: followUp, alreadyUsed: usedCaseIds, caseIdFor: built.caseIdFor)
+        var tipped = false
+        if case .tip = next.outcome { tipped = true }
+        passed = passed && g.passed
+        unsafe = unsafe || g.unsafe
+        wrongShown = wrongShown || (tipped && !g.passed)
+        gaveTip = gaveTip || tipped
+        grades.append("\(step + 2) “\(followUp.say)”: \(g.detail)")
+        shownSteps.append(shown(next))
+        if let d = next.detail { details.append(d) }
+        total += s
+        escalated = escalated || next.escalated
+        last = next
+      }
+      if stopped { break }
       results.append(EvalCaseResult(
-        id: c.id, split: c.split, passed: graded.passed, unsafe: graded.unsafe, grade: graded.detail,
-        shown: shown, source: answer.source, escalated: answer.escalated,
-        seconds: Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18,
-        modelDetail: answer.detail, expected: c.expect.outcome.rawValue, gaveTip: gaveTip
+        id: c.id, split: c.split, passed: passed, unsafe: unsafe, grade: grades.joined(separator: " · "),
+        shown: shownSteps.joined(separator: " → "), source: answer.source, escalated: escalated, seconds: total,
+        modelDetail: details.isEmpty ? nil : details.joined(separator: "\n"),
+        expected: c.expect.outcome.rawValue, gaveTip: gaveTip, wrongTipShown: wrongShown, steps: shownSteps.count
       ))
     }
     await progress(results.count, cases.count)

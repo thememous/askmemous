@@ -83,7 +83,7 @@ after seeing the cases. Every change and run is dated in
 and "Didn't help" ask the same question again with the notes already used left
 out, so every follow-up runs the same checked path. "Why this note?" is answered
 by the app from the note's own words, with no model. When no unused note can
-back a tip, the app says so.
+back a tip, the app says so. The eval has eight such conversations (see below).
 
 The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 `AskModel` protocol. `HybridAskFirebase` is the Firebase AI Logic version.
@@ -157,8 +157,15 @@ fictional. Each case gives a child, some notes, a question and the expected
 outcome: a tip from a given note, a tip or no tip, or a specific fixed reply.
 Some also list words a tip must never contain.
 
+Eight cases (`f01`–`f08`) are short conversations. After the first tip, the
+parent taps "Another idea?" or "That didn't help." one to three times. Once the
+good notes are used up, what's left is unsafe for the child's age, a worse day,
+off-topic, or nothing, and the answer must be a fixed reply, never a weaker
+tip. They are counted in their own "Follow-ups" column, so the single-question
+numbers above stay comparable.
+
 To run it, open **Settings → Eval runner** in the app. Pick a variant and a
-route, then **Run**. Cloud runs wait 4.5 seconds between calls to stay within
+route, and which cases (all, held-out only, or follow-ups only), then **Run**. Cloud runs wait 4.5 seconds between calls to stay within
 the Gemini free tier. Share the table or the full details from the same screen.
 
 ## License

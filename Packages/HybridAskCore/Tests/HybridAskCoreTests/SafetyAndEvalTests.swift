@@ -27,7 +27,7 @@ private final class ProbeModel: AskModel, @unchecked Sendable {
     #expect(ids.count == c.notes.count, "\(c.id): note ids must be unique")
     for id in c.expect.noteIds ?? [] { #expect(ids.contains(id), "\(c.id): expected note \(id) missing") }
     if c.expect.outcome == .floor { #expect(c.expect.reason != nil, "\(c.id): floor needs a reason") }
-    #expect(["dev", "heldout"].contains(c.split))
+    #expect(["dev", "heldout", EvalCase.followUpSplit].contains(c.split))
   }
 }
 

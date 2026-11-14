@@ -11,7 +11,7 @@ struct EvalView: View {
 
   @State private var variant: AskVariant = .modelPoints
   @State private var route: AskRoute = .onDeviceOnly
-  @State private var heldoutOnly = false
+  @State private var caseSet: CaseSet = .all
   @State private var reports: [EvalReport] = EvalStore.load()
   @State private var running: Task<Void, Never>?
   @State private var progress = (done: 0, total: 0)
@@ -32,7 +32,9 @@ struct EvalView: View {
         Picker("Route", selection: $route) {
           ForEach(AskRoute.allCases) { Text($0.rawValue).tag($0) }
         }
-        Toggle("Held-out cases only", isOn: $heldoutOnly)
+        Picker("Cases", selection: $caseSet) {
+          ForEach(CaseSet.allCases) { Text($0.title).tag($0) }
+        }
         if running == nil {
           Button("Run") { start() }
         } else {
@@ -91,6 +93,9 @@ struct EvalView: View {
 
   private var runFooter: String {
     var lines = ["Cases are fictional. They run one at a time; the on-device model takes a few seconds each."]
+    if caseSet == .followUps {
+      lines.append("Follow-ups are short conversations: after a tip, “Another idea?” or “That didn't help.” asks again without the notes already used. Their results replace the follow-ups in the latest run of the same kind; the other numbers stay.")
+    }
     if route != .onDeviceOnly {
       lines.append("Cloud runs wait about 4.5 s between model calls to stay under the free tier's 15 requests a minute.")
     }
@@ -110,25 +115,50 @@ struct EvalView: View {
   private func start() {
     let cases: [EvalCase]
     do {
-      cases = try EvalSet.bundled().cases.filter { !heldoutOnly || $0.split == "heldout" }
+      cases = try EvalSet.bundled().cases.filter(caseSet.includes)
     } catch {
       loadError = "Couldn't load the eval cases: \(error.localizedDescription)"
       return
     }
-    let variant = variant, route = route, allowed = cloudAllowed, runner = runner
+    let variant = variant, route = route, allowed = cloudAllowed, runner = runner, caseSet = caseSet
     progress = (0, cases.count)
     UIApplication.shared.isIdleTimerDisabled = true
     running = Task {
       // Stay under the cloud free tier's 15 requests a minute.
       let pace: Duration = route == .onDeviceOnly ? .zero : .milliseconds(4_500)
-      let report = await runner.run(cases, variant: variant, route: route, cloudAllowed: allowed, pace: pace) { done, total in
+      var report = await runner.run(cases, variant: variant, route: route, cloudAllowed: allowed, pace: pace) { done, total in
         await MainActor.run { progress = (done, total) }
+      }
+      if caseSet == .followUps, let old = reports.first(where: { $0.id == report.id }) {
+        // Keep the single-question results of the last run; replace only the conversations.
+        report = EvalReport(variant: variant, route: route, runAt: report.runAt,
+                            results: old.single + report.results, complete: old.complete && report.complete)
       }
       reports.removeAll { $0.id == report.id }
       reports.append(report)
       EvalStore.save(reports)
       UIApplication.shared.isIdleTimerDisabled = false
       running = nil
+    }
+  }
+}
+
+/// Which eval cases a run uses.
+private enum CaseSet: String, CaseIterable, Identifiable {
+  case all, heldout, followUps
+  var id: String { rawValue }
+  var title: String {
+    switch self {
+    case .all: "All"
+    case .heldout: "Held-out only"
+    case .followUps: "Follow-ups only"
+    }
+  }
+  func includes(_ c: EvalCase) -> Bool {
+    switch self {
+    case .all: true
+    case .heldout: c.split == "heldout"
+    case .followUps: c.split == EvalCase.followUpSplit
     }
   }
 }
@@ -153,6 +183,10 @@ private struct ReportRow: View {
           .monospacedDigit()
       } else {
         Text("Run again to count right and wrong tips").font(.caption).foregroundStyle(.secondary)
+      }
+      if !report.followUps.isEmpty {
+        Text("Follow-ups \(report.followUpPassed)/\(report.followUps.count) · wrong \(report.followUpWrong) · unsafe \(report.followUpUnsafe)")
+          .monospacedDigit()
       }
       if report.isReference != true {
         Text("On device \(report.onDevice) · cloud \(report.cloud) · app \(report.appOnly) · avg \(report.meanModelSeconds, format: .number.precision(.fractionLength(1))) s\(report.complete ? "" : " · stopped")")
@@ -214,7 +248,8 @@ enum EvalStore {
   static func details(_ reports: [EvalReport]) -> String {
     var lines: [String] = []
     for r in reports {
-      lines.append("## \(r.variant.title) · \(r.routeTitle) · \(r.passed)/\(r.total)")
+      let followUps = r.followUps.isEmpty ? "" : " · follow-ups \(r.followUpText)"
+      lines.append("## \(r.variant.title) · \(r.routeTitle) · \(r.passed)/\(r.total)\(followUps)")
       for c in r.results {
         let mark = c.unsafe ? "UNSAFE" : c.passed ? "ok" : "FAIL"
         lines.append("- \(mark) \(c.id) [\(c.expected ?? "?")] \(c.source.rawValue)\(c.escalated ? "+esc" : ""): \(c.shown)")
