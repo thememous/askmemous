@@ -120,6 +120,7 @@ AskMemoUS/AppIcon.xcassets/    The app icon, MemoUS art (not open-licensed, see 
 Packages/HybridAskCore/        Gates, note filter, prompt, checks, tip text, eval cases and runner
 Packages/HybridAskFirebase/    AskModel backed by Firebase AI Logic (on-device + Gemini)
 docs/EVAL_LOG.md               Every eval change and run, dated
+PRIVACY.md                     What the app stores and what it sends, and when
 project.yml                    XcodeGen project (the .xcodeproj is generated, not committed)
 ```
 
