@@ -7,7 +7,9 @@ import HybridAskFirebase
 /// answering, on each route, and keeps the latest numbers for each pair on this phone.
 struct EvalView: View {
   @AppStorage(CloudChecks.consentKey) private var cloudConsent = "undecided"
-  private var cloudAllowed: Bool { cloudConsent == "allowed" }
+  @Environment(RemoteAskSettings.self) private var remote
+  /// The eval uses the built-in safety lists. The kill switch still blocks a cloud call.
+  private var cloudAllowed: Bool { cloudConsent == "allowed" && remote.cloudEnabled }
 
   @State private var variant: AskVariant = .modelPoints
   @State private var route: AskRoute = .onDeviceOnly
@@ -99,7 +101,9 @@ struct EvalView: View {
     if route != .onDeviceOnly {
       lines.append("Cloud runs wait about 4.5 s between model calls to stay under the free tier's 15 requests a minute.")
     }
-    if route != .onDeviceOnly && !cloudAllowed {
+    if route != .onDeviceOnly && !remote.cloudEnabled {
+      lines.append("Cloud checks are paused, so this run stays on the phone.")
+    } else if route != .onDeviceOnly && !cloudAllowed {
       lines.append("Cloud checks are off, so cloud cases will show the “cloud checks are off” reply. Turn them on in Settings first.")
     }
     return lines.joined(separator: " ")

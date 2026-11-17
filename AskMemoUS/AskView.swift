@@ -31,9 +31,16 @@ struct AskView: View {
 
   @AppStorage(CloudChecks.consentKey) private var cloudConsent = "undecided"
   @AppStorage(CloudChecks.routeKey) private var route: AskRoute = .hybrid
-  private var cloudAllowed: Bool { cloudConsent == "allowed" }
+  @Environment(LabUnlock.self) private var lab
+  @Environment(RemoteAskSettings.self) private var remote
+  /// While the lab is locked, a saved Cloud-only or On-device route does not apply.
+  private var activeRoute: AskRoute { route.forParent(labUnlocked: lab.showsLab) }
+  /// The kill switch counts as not allowed. It does not change the saved choice.
+  private var cloudAllowed: Bool { cloudConsent == "allowed" && remote.cloudEnabled }
 
-  private let ask = HybridAsk(model: FirebaseAskModel())
+  private func asker() -> HybridAsk {
+    HybridAsk(model: FirebaseAskModel(cloudModelName: remote.cloudModelName))
+  }
 
   static let suggestions = [
     "She keeps waking at 5am. What could I try this week?",
@@ -49,7 +56,7 @@ struct AskView: View {
             if turns.isEmpty { welcome } else {
               ForEach(turns) { turn in turnView(turn) }
               if let last = lastAnswer, case .tip = last.outcome, !isAsking { followUps }
-              if let last = lastAnswer, last.cloudCouldHelp, cloudConsent == "undecided", !isAsking { consentCard }
+              if let last = lastAnswer, last.cloudCouldHelp, cloudConsent == "undecided", remote.cloudEnabled, !isAsking { consentCard }
             }
             Color.clear.frame(height: 1).id("bottom")
           }
@@ -63,9 +70,9 @@ struct AskView: View {
       .safeAreaInset(edge: .bottom) { composer }
       .navigationTitle("Ask")
       .toolbar {
-        if route != .hybrid {
+        if activeRoute != .hybrid {
           ToolbarItem(placement: .topBarLeading) {
-            Text(route.rawValue).font(.caption).foregroundStyle(.orange)
+            Text(activeRoute.rawValue).font(.caption).foregroundStyle(.orange)
           }
         }
         if !turns.isEmpty {
@@ -281,8 +288,9 @@ struct AskView: View {
     let index = turns.count - 1
     let askedAt = Date.now
     let askChild = child.askChild
-    let result = await ask.answer(question: topic, child: askChild, notes: notes.map(\.askNote),
-                                  route: route, cloudAllowed: cloudAllowed, excluding: used, now: askedAt)
+    let result = await asker().answer(question: topic, child: askChild, notes: notes.map(\.askNote),
+                                      route: activeRoute, cloudAllowed: cloudAllowed, excluding: used,
+                                      safety: remote.safety, now: askedAt)
     turns[index].reply = .answer(result)
     if case let .tip(_, note) = result.outcome { used.insert(note.id) }
     guard result.outcome != .floor(.emptyQuestion) else { return }

@@ -18,6 +18,9 @@ final class AskAppCheckFactory: NSObject, AppCheckProviderFactory {
 
 @main
 struct AskMemoUSApp: App {
+  @State private var remote = RemoteAskSettings()
+  @State private var lab = LabUnlock()
+
   init() {
     AppCheck.setAppCheckProviderFactory(AskAppCheckFactory())
     FirebaseApp.configure()
@@ -26,6 +29,9 @@ struct AskMemoUSApp: App {
   var body: some Scene {
     WindowGroup {
       RootView()
+        .environment(remote)
+        .environment(lab)
+        .task { await remote.fetch() }
     }
     .modelContainer(for: [Child.self, JournalNote.self, SavedQuestion.self])
   }
