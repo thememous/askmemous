@@ -32,7 +32,7 @@ struct FreeTip {
 /// `AskModel` backed by Firebase AI Logic hybrid inference.
 public struct FirebaseAskModel: AskModel, FreeTextAskModel {
   /// A "billing not required" model on the Firebase AI Logic models list.
-  public static let defaultCloudModel = "gemini-3.5-flash-lite"
+  public static let defaultCloudModel = CloudModelName.fallback
 
   let cloudModelName: String
 

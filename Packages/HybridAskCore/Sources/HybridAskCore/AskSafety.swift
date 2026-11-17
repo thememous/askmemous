@@ -18,12 +18,24 @@ public enum AskSafety {
   }
 
   /// Checked in this order: emergency, then distress, then health.
+  /// Uses the lists built into the app. Remote phrases go through `withExtras`.
   public static func gate(question: String) -> QuestionGate? {
-    let text = padded(question)
-    if matches(text, emergencyPhrases) != nil { return .emergency }
-    if matches(text, distressPhrases) != nil { return .parentDistress }
-    if matches(text, healthPhrases) != nil || AskCheck.mentionsMedical(question) { return .health }
-    return nil
+    AskSafetyLists.builtIn.gate(question: question)
+  }
+
+  /// Built-in lists plus `extras`. Extras are cleaned and appended. They cannot
+  /// remove or replace a phrase that ships with the app. Empty extras are the
+  /// built-in lists, which is what the eval runner and the unit tests use.
+  public static func withExtras(_ extras: AskSafetyExtras) -> AskSafetyLists {
+    let extraRules = AskSafetyExtras.acceptedRules(extras.unsafeTipRules).map {
+      TipRule(underMonths: $0.underMonths, phrases: [$0.phrase])
+    }
+    return AskSafetyLists(
+      emergency: emergencyPhrases + AskSafetyExtras.acceptedPhrases(extras.emergencyPhrases),
+      distress: distressPhrases + AskSafetyExtras.acceptedPhrases(extras.distressPhrases),
+      health: healthPhrases + AskSafetyExtras.acceptedPhrases(extras.healthPhrases),
+      tipRules: tipRules + extraRules
+    )
   }
 
   static let emergencyPhrases = [
@@ -70,26 +82,22 @@ public enum AskSafety {
   // MARK: - Tips
 
   /// The first forbidden phrase in a tip for this age, or nil. Unknown age gets every rule.
+  /// Uses the lists built into the app. Remote rules go through `withExtras`.
   public static func unsafePhrase(inTip tip: String, ageMonths: Int?) -> String? {
-    var text = padded(tip)
-    for safe in safeExceptions { text = text.replacingOccurrences(of: " \(safe) ", with: " ") }
-    for rule in tipRules where ageMonths == nil || ageMonths! < rule.underMonths {
-      if let hit = matches(text, rule.phrases) { return hit }
-    }
-    return nil
+    AskSafetyLists.builtIn.unsafePhrase(inTip: tip, ageMonths: ageMonths)
   }
 
   /// A tip is unsafe if it names something unsafe for the child's age, or if
   /// the note it rests on does. "Try 'Fed and fell asleep' again" never says
   /// "propped bottle", but repeating that day would (n16, 2026-11-14).
   public static func unsafePhrase(inTip tip: String, basedOn note: AskNote, ageMonths: Int?) -> String? {
-    unsafePhrase(inTip: tip, ageMonths: ageMonths) ?? unsafePhrase(inTip: note.text, ageMonths: ageMonths)
+    AskSafetyLists.builtIn.unsafePhrase(inTip: tip, basedOn: note, ageMonths: ageMonths)
   }
 
   /// Safe phrases removed before matching ("tummy time" is recommended for awake babies).
   static let safeExceptions = ["tummy time", "bath water", "warm bath"]
 
-  struct TipRule {
+  struct TipRule: Equatable {
     let underMonths: Int
     let phrases: [String]
   }
@@ -136,5 +144,41 @@ public enum AskSafety {
       }
       return paddedText.contains(" " + phrase + " ")
     }
+  }
+}
+
+/// The phrases a question or a tip is checked against. `.builtIn` is what ships
+/// in the app and what the eval uses. `AskSafety.withExtras` appends to it.
+public struct AskSafetyLists: Sendable, Equatable {
+  let emergency: [String]
+  let distress: [String]
+  let health: [String]
+  let tipRules: [AskSafety.TipRule]
+
+  public static let builtIn = AskSafety.withExtras(.none)
+
+  public func gate(question: String) -> AskSafety.QuestionGate? {
+    let text = AskSafety.padded(question)
+    if AskSafety.matches(text, emergency) != nil { return .emergency }
+    if AskSafety.matches(text, distress) != nil { return .parentDistress }
+    if AskSafety.matches(text, health) != nil || AskCheck.mentionsMedical(question) { return .health }
+    return nil
+  }
+
+  /// The first forbidden phrase in a tip for this age, or nil. Unknown age gets every rule.
+  public func unsafePhrase(inTip tip: String, ageMonths: Int?) -> String? {
+    var text = AskSafety.padded(tip)
+    for safe in AskSafety.safeExceptions {
+      text = text.replacingOccurrences(of: " \(safe) ", with: " ")
+    }
+    for rule in tipRules where ageMonths == nil || ageMonths! < rule.underMonths {
+      if let hit = AskSafety.matches(text, rule.phrases) { return hit }
+    }
+    return nil
+  }
+
+  /// A tip is unsafe if it names something unsafe for the child's age, or if the note it rests on does.
+  public func unsafePhrase(inTip tip: String, basedOn note: AskNote, ageMonths: Int?) -> String? {
+    unsafePhrase(inTip: tip, ageMonths: ageMonths) ?? unsafePhrase(inTip: note.text, ageMonths: ageMonths)
   }
 }

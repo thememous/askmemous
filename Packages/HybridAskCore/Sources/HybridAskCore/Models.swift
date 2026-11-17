@@ -101,6 +101,26 @@ public enum AskRoute: String, Sendable, Codable, CaseIterable, Identifiable {
   case cloudOnly = "Cloud only"
   case onDeviceOnly = "On-device only"
   public var id: String { rawValue }
+
+  /// The route a parent actually gets. The lab picker is hidden until it is
+  /// unlocked, and a Cloud-only or On-device choice saved before that must not apply.
+  public func forParent(labUnlocked: Bool) -> AskRoute {
+    labUnlocked ? self : .hybrid
+  }
+}
+
+/// The cloud model id. Empty, or anything that is not a short model id, keeps the built-in one.
+public enum CloudModelName {
+  public static let fallback = "gemini-3.5-flash-lite"
+
+  public static func resolve(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
+    guard (1...80).contains(trimmed.count), trimmed.unicodeScalars.allSatisfy(allowed.contains) else {
+      return fallback
+    }
+    return trimmed
+  }
 }
 
 /// Anything that can turn instructions + a prompt into a draft.

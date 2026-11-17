@@ -11,6 +11,8 @@ public struct HybridAsk: Sendable {
   /// - Parameter cloudAllowed: whether the parent has allowed cloud checks. Without it,
   ///   nothing leaves the phone: `.hybrid` runs on-device only and marks answers the
   ///   cloud might improve with `cloudCouldHelp`, so the app can ask.
+  /// - Parameter safety: built-in lists, plus any phrases added later. The default is
+  ///   the built-in lists alone, which is what the eval runner uses.
   public func answer(
     question: String,
     child: AskChild,
@@ -18,11 +20,12 @@ public struct HybridAsk: Sendable {
     route: AskRoute = .hybrid,
     cloudAllowed: Bool = false,
     excluding used: Set<UUID> = [],
+    safety: AskSafetyLists = .builtIn,
     now: Date = Date()
   ) async -> AskAnswer {
     let q = question.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !q.isEmpty else { return .app(.emptyQuestion) }
-    switch AskSafety.gate(question: q) {
+    switch safety.gate(question: q) {
     case .emergency: return .app(.emergency)
     case .parentDistress: return .app(.parentDistress)
     case .health: return .app(.medicalTopic)
@@ -45,7 +48,7 @@ public struct HybridAsk: Sendable {
     let instructions = AskPrompt.instructions(for: child)
     let prompt = AskPrompt.prompt(question: q, child: child, numbered: numbered)
     func run(_ r: AskRoute) async throws -> AskAnswer {
-      let first = try await attempt(instructions, prompt, r, q, child, numbered)
+      let first = try await attempt(instructions, prompt, r, q, child, numbered, safety)
       // When the app refuses the note the model picked (unsafe, worse day, off topic,
       // words not in the note), ask once more on the same route without that note.
       guard let refused = first.refused else { return first.answer }
@@ -54,7 +57,7 @@ public struct HybridAsk: Sendable {
       let again = AskPrompt.number(AskRetrieval.select(rest, question: q, limit: AskRetrieval.defaultLimit),
                                    now: now, childName: child.name)
       let retryPrompt = AskPrompt.prompt(question: q, child: child, numbered: again)
-      guard let second = try? await attempt(instructions, retryPrompt, r, q, child, again) else {
+      guard let second = try? await attempt(instructions, retryPrompt, r, q, child, again, safety) else {
         return first.answer
       }
       return second.answer.withDetail(
@@ -103,12 +106,13 @@ public struct HybridAsk: Sendable {
 
   private func attempt(
     _ instructions: String, _ prompt: String, _ route: AskRoute,
-    _ question: String, _ child: AskChild, _ numbered: AskPrompt.Numbered
+    _ question: String, _ child: AskChild, _ numbered: AskPrompt.Numbered,
+    _ safety: AskSafetyLists
   ) async throws -> (answer: AskAnswer, refused: AskNote?) {
     let result = try await model.draft(instructions: instructions, prompt: prompt, route: route)
     var outcome = AskCheck.review(result.draft, notes: numbered.ids, child: child)
     if case let .tip(text, note) = outcome {
-      if AskSafety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
+      if safety.unsafePhrase(inTip: text, basedOn: note, ageMonths: child.ageMonths) != nil {
         outcome = .floor(.unsafeTip)
       } else if !AskCheck.isRelevant(question: question, note: note) {
         outcome = .floor(.noSupportingNote)
