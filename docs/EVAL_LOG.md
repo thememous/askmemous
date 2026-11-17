@@ -391,3 +391,12 @@ Rerun in the same simulator, on device, all 71 cases (tuned, not held-out):
 - Follow-ups: 7 / 8, 0 wrong, 0 unsafe (unchanged; f08 hit the guardrail).
 - Other misses unchanged: h25 (guardrail), n10 (copy includes the part before
   "but").
+
+## 2026-11-17 · Safety lists can be extended from Remote Config
+
+Extra emergency, distress, health and age-unsafe phrases can be added from
+Firebase Remote Config. They are merged onto the lists in the app and cannot
+remove or replace a phrase that ships with it. A missing, empty or malformed
+value leaves the built-in lists unchanged. The eval runner and `swift test`
+use the built-in lists only, so the numbers above stay comparable. No new
+eval run was made for this: the gates the cases hit are the same lists.

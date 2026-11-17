@@ -1,6 +1,6 @@
 # AskMemoUS privacy policy
 
-Last updated: November 16, 2026
+Last updated: November 17, 2026
 
 AskMemoUS is a test app for the #BuildHybridAI 2026 challenge, made by MemoUS
 Software Development Services, Cebu City, Philippines. This policy covers
@@ -11,10 +11,11 @@ AskMemoUS only. The MemoUS app has its own policy at
 
 - No account, no sign-in, no ads, no analytics, no tracking.
 - Your child's name, notes and questions are stored only on your iPhone.
-- Nothing leaves the iPhone unless you turn on **Allow cloud checks**. Then, only
-  when the iPhone couldn't answer, the question and some notes are sent to
+- Nothing about your child leaves the iPhone unless you turn on **Allow cloud checks**.
+  Then, only when the iPhone couldn't answer, the question and some notes are sent to
   Google's Gemini model to get an answer, with your child's name replaced by
-  "your child".
+  "your child". The app does download its own settings from Firebase Remote Config.
+  That sends no notes, questions or names.
 
 ## What the app stores, and where
 
@@ -29,6 +30,10 @@ The app opens with a fictional child and sample notes. You can change or delete
 them.
 
 We have no server that stores your data, and we can't see it.
+
+The app downloads settings from Firebase Remote Config (which model to use,
+whether cloud checks are paused, and extra safety phrases). That download sends
+no notes, questions or names. Firebase uses an installation ID for it.
 
 ## When something leaves the iPhone
 

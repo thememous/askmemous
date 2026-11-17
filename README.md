@@ -95,6 +95,21 @@ reads the notes; no model is involved.
 The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 `AskModel` protocol. `HybridAskFirebase` is the Firebase AI Logic version.
 
+**Remote Config.** At launch the app fetches three settings from Firebase
+Remote Config and caches them on the phone. If the fetch fails or a value is
+missing, it uses the copies built into the app. Nothing about the journal, the
+notes, the questions or the child is sent.
+
+- `cloud_model`: the Gemini model id. Empty or not a model id falls back to
+  `gemini-3.5-flash-lite`.
+- `cloud_enabled`: when false, the app makes no cloud request and hides
+  "Check in the cloud", whatever the parent chose. Their choice is kept, and
+  Settings says cloud checks are paused.
+- `extra_emergency_phrases`, `extra_health_phrases`, `extra_distress_phrases`,
+  and `extra_unsafe_tip_rules`: phrases added to the safety lists. They can
+  only add a match. They cannot remove or weaken a phrase that ships with the
+  app. The eval runner and the unit tests use the built-in lists only.
+
 ## What it doesn't do
 
 - **It isn't medical advice.** Health questions get a fixed reply, and every
@@ -103,7 +118,8 @@ The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
   note backs a tip, it says so and suggests what to note next time.
 - **The gates are word lists.** They fail closed ("she swallowed her food" gets
   the emergency reply), but a worry phrased in words they don't know gets
-  through to the normal checks. English only.
+  through to the normal checks. English only. Remote Config can add phrases.
+  It cannot remove one.
 - **The held-out set is small and not independent.** It has 31 cases, written by
   the same person who wrote the checks, though before they changed.
 - **Apple's guardrails sometimes refuse ordinary notes** on device, even with
@@ -175,7 +191,10 @@ off-topic, or nothing, and the answer must be a fixed reply, never a weaker
 tip. They are counted in their own "Follow-ups" column, so the single-question
 numbers above stay comparable.
 
-To run it, open **Settings → Eval runner** in the app. Pick a variant and a
+To run it, open **Settings → Eval runner**. In a Release build the eval runner
+and the model picker stay hidden until you tap the version line at the bottom
+of Settings seven times. That lasts until you quit the app. Debug builds show
+them straight away. Pick a variant and a
 route, and which cases (all, held-out only, or follow-ups only), then **Run**. Cloud runs wait 4.5 seconds between calls to stay within
 the Gemini free tier. Share the table or the full details from the same screen.
 
