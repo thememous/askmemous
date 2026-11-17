@@ -73,7 +73,8 @@ public struct AskSafetyExtras: Sendable, Equatable {
   }
 
   /// Lowercased, with punctuation as spaces, keeping a trailing `*` wildcard.
-  /// Nil when the entry is blank or longer than 60 characters.
+  /// Nil when the entry is blank, longer than 60 characters, or a wildcard with
+  /// fewer than 3 letters before the `*` ("a*" would match almost every question).
   static func cleanPhrase(_ raw: String) -> String? {
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, trimmed.count <= maxCharacters else { return nil }
@@ -81,6 +82,7 @@ public struct AskSafetyExtras: Sendable, Equatable {
     let body = wildcard ? String(trimmed.dropLast()) : trimmed
     let normalized = AskCheck.normalized(body)
     guard !normalized.isEmpty else { return nil }
+    if wildcard, normalized.filter(\.isLetter).count < 3 { return nil }
     return wildcard ? normalized + "*" : normalized
   }
 

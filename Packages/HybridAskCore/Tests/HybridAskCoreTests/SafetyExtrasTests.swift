@@ -93,6 +93,13 @@ private func extras(
   #expect(AskSafety.gate(question: "She licked the radiator paint") == nil)
 }
 
+@Test func shortWildcardExtrasAreIgnored() {
+  let lists = extras(emergency: #"["a*", "ab*", "abs*"]"#)
+  #expect(lists.gate(question: "She had a snack") == nil)
+  #expect(lists.gate(question: "She abandoned the nap") == nil)
+  #expect(lists.gate(question: "She was absent at lunch") == .emergency)
+}
+
 @Test func cloudModelNameRejectsEmptyAndInvalid() {
   #expect(CloudModelName.resolve("") == CloudModelName.fallback)
   #expect(CloudModelName.resolve("   ") == CloudModelName.fallback)

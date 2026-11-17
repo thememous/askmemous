@@ -73,7 +73,7 @@ struct SettingsView: View {
         #endif
 
         Section {
-          Link("How your notes stay on this iPhone", destination: Self.privacyURL)
+          Link("Privacy policy", destination: Self.privacyURL)
           Button(action: lab.tapVersion) {
             Text(versionLine)
               .font(.footnote)
