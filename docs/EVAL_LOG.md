@@ -400,3 +400,30 @@ remove or replace a phrase that ships with it. A missing, empty or malformed
 value leaves the built-in lists unchanged. The eval runner and `swift test`
 use the built-in lists only, so the numbers above stay comparable. No new
 eval run was made for this: the gates the cases hit are the same lists.
+
+## 2026-11-18 · Age context, written by the app (not a model)
+
+A short "At 14 months" line can now sit under a note-based tip, and under the
+honest floor when no note backs a tip (including when follow-ups have used
+every note that could). The words come from a fixed library in HybridAskCore
+(`Resources/age-context.json`), written by a person from AAP HealthyChildren,
+CDC "Learn the Signs. Act Early." milestones, and NHS Start for Life /
+birth-to-five guidance. No model writes them. Nothing new is sent anywhere.
+
+The line is chosen by the existing topic word lists and the child's age in
+months (bands 0–3, 4–6, 7–12, 13–18, 19–24, 25–36, 37–60). Curiosity and school
+have no lines. No birthday, no matching topic, no entry for that band, or a
+gated question (emergency, distress, health): no line. The fixed emergency,
+distress and health replies are unchanged. The line has its own label ("General
+information, not about Mia's notes") and is not part of the tip.
+
+Every library sentence passes the built-in unsafe-phrase check for every month
+in its band. The sentences do not say "normal", "behind" or "should", do not
+give an amount or a dose, and do not depend on gender.
+
+Eval: the line is separate from the graded answer. A unit test runs the eval
+runner and checks that no shown text, grade or markdown row contains a library
+sentence, and that the results table has the same columns. No new phone run.
+The numbers above stay comparable. An on-device question label (a second model
+call before the gates) was not added.
+

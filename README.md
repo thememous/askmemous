@@ -79,6 +79,11 @@ after seeing the cases. Every change and run is dated in
 7. **Hybrid, with consent.** With cloud checks off, nothing leaves the phone.
    With them on, the app asks the cloud once, and only when the on-device answer
    failed a check or the model wasn't available.
+8. **An age line, from a library.** Under a tip, or when no note backs one, the
+   app may add a short line for the child's age ("At 14 months"). A person wrote
+   every sentence. No model writes it. It stays off when there is no birthday,
+   the question names no topic the library covers, or the reply is the fixed
+   emergency, distress or health one.
 
 **Follow-ups.** Ask is a short conversation. Under each tip, "Another idea"
 and "Didn't help" ask the same question again with the notes already used left
@@ -94,6 +99,32 @@ reads the notes; no model is involved.
 
 The core (`HybridAskCore`) has no AI SDK in it. Any model plugs in through the
 `AskModel` protocol. `HybridAskFirebase` is the Firebase AI Logic version.
+
+## Age context
+
+The age line is general information. It is not a reading of this child's notes,
+and it is not a tip. A person wrote every sentence and bundled it with the app
+([`age-context.json`](Packages/HybridAskCore/Sources/HybridAskCore/Resources/age-context.json)).
+No model writes it, on device or in the cloud, and nothing new leaves the phone
+to produce it.
+
+The sources are the American Academy of Pediatrics (HealthyChildren.org, on
+sleep, feeding and media), the CDC's "Learn the Signs. Act Early." milestones,
+and NHS Start for Life and birth-to-five guidance. The lines describe what is
+common at an age ("Many toddlers this age still need one nap a day."). They do
+not diagnose, give an amount or a dose, or say "normal", "behind" or "should".
+They do not depend on gender. The app has no gender field.
+
+The app picks the line with the same word lists it uses for topics: sleep, food,
+play, feelings, talking, moving, care, outings and screens. Curiosity and school
+have no lines. The child's age in months picks the band: 0–3, 4–6, 7–12, 13–18,
+19–24, 25–36 or 37–60. No birthday, no matching topic, no entry for that band,
+or an age past 60 months: no line. The app does not guess.
+
+On the card, the tip's source line still says where the tip came from (on this
+iPhone, the cloud, or the app). The age line has its own label, "General
+information, not about Mia's notes". Every line is checked against the same
+age-unsafe phrase list as a tip, for every month in its band.
 
 **Remote Config.** At launch the app fetches three settings from Firebase
 Remote Config and caches them on the phone. If the fetch fails or a value is
@@ -114,8 +145,12 @@ notes, the questions or the child is sent.
 
 - **It isn't medical advice.** Health questions get a fixed reply, and every
   tip ends with "If you're worried, ask your paediatrician."
-- **It only repeats what the parent noted.** It won't invent a new idea. If no
-  note backs a tip, it says so and suggests what to note next time.
+- **Age context is general.** It is not about this child, and it is not medical
+  advice. It says what is common at that age. It does not say a child is behind,
+  and it does not give amounts or doses.
+- **The tip only repeats what the parent noted.** It won't invent a new idea. If no
+  note backs a tip, it says so and suggests what to note next time. The age line,
+  when it shows, is that general context, not a new tip.
 - **The gates are word lists.** They fail closed ("she swallowed her food" gets
   the emergency reply), but a worry phrased in words they don't know gets
   through to the normal checks. English only. Remote Config can add phrases.
@@ -133,9 +168,10 @@ AskMemoUS/                     SwiftUI app: Ask, Notes, Your questions, Settings
 AskMemoUS/Mascot.xcassets/     Memo, the MemoUS mascot (not open-licensed, see MASCOT-LICENSE.md)
 AskMemoUS/TabIcons.xcassets/   The tab icons, MemoUS art (not open-licensed, see MASCOT-LICENSE.md)
 AskMemoUS/AppIcon.xcassets/    The app icon, MemoUS art (not open-licensed, see MASCOT-LICENSE.md)
-Packages/HybridAskCore/        Gates, note filter, prompt, checks, tip text, eval cases and runner
+Packages/HybridAskCore/        Gates, note filter, prompt, checks, tip text, age context, eval cases and runner
 Packages/HybridAskFirebase/    AskModel backed by Firebase AI Logic (on-device + Gemini)
 docs/EVAL_LOG.md               Every eval change and run, dated
+docs/DEMO_VIDEO_PLAN.md        Shot list for the demo video (the owner records and narrates it)
 PRIVACY.md                     What the app stores and what it sends, and when
 project.yml                    XcodeGen project (the .xcodeproj is generated, not committed)
 ```
