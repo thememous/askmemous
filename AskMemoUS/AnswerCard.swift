@@ -6,10 +6,11 @@ import HybridAskCore
 struct AnswerSection: View {
   let answer: AskAnswer
   let childName: String
+  var ageLine: AgeContext.Line? = nil
 
   var body: some View {
     Section {
-      AnswerBody(answer: answer, childName: childName)
+      AnswerBody(answer: answer, childName: childName, ageLine: ageLine)
     } header: {
       SourceLabel(answer: answer)
     }
@@ -20,6 +21,7 @@ struct AnswerSection: View {
 struct AnswerBody: View {
   let answer: AskAnswer
   let childName: String
+  var ageLine: AgeContext.Line? = nil
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -43,10 +45,36 @@ struct AnswerBody: View {
       case let .floor(reason):
         Text(FloorText.text(reason, childName: childName)).foregroundStyle(Theme.ink)
       }
+      if let ageLine {
+        AgeContextBlock(line: ageLine, childName: childName)
+      }
       #if DEBUG
       DebugLines(answer: answer)
       #endif
     }
+  }
+}
+
+/// General age context under the tip. Smaller and quieter than the tip, and labelled
+/// as coming from the app rather than from this child's notes.
+struct AgeContextBlock: View {
+  let line: AgeContext.Line
+  let childName: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      Text(line.label)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(Theme.muted)
+      Text(line.text)
+        .font(.footnote)
+        .foregroundStyle(Theme.muted)
+      Text(line.attribution(childName: childName))
+        .font(.caption2)
+        .foregroundStyle(Theme.muted)
+    }
+    .fixedSize(horizontal: false, vertical: true)
+    .accessibilityElement(children: .combine)
   }
 }
 
