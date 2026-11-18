@@ -74,6 +74,35 @@ private struct EagerWriter: FreeTextAskModel {
   #expect(writes.rightTips + writes.wrongTips <= writes.results.filter { $0.gaveTip == true }.count)
 }
 
+@Test func evalRunnerOutputDoesNotIncludeAgeContext() async throws {
+  let cases = try EvalSet.bundled().cases
+  let runner = EvalRunner(pointer: FirstNotePointer(), writer: EagerWriter(tip: "Try that again."))
+  let report = await runner.run(cases, variant: .modelPoints, route: .onDeviceOnly, cloudAllowed: false)
+  #expect(report.complete)
+  #expect(AgeContext.entryTexts.count == 63)
+  for result in report.results {
+    for text in AgeContext.entryTexts {
+      #expect(!result.shown.contains(text), "\(result.id) showed an age line")
+      #expect(!result.grade.contains(text), "\(result.id) graded an age line")
+    }
+    #expect(!result.shown.contains("General information"))
+  }
+  #expect(!report.markdownRow.contains("General information"))
+  #expect(EvalReport.markdownHeader == """
+  | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | Follow-ups | On device / cloud / app | Avg model s |
+  |---|---|---|---|---|---|---|---|---|---|
+  """)
+  // The 5am-style sleep question still has an age line available. The runner just doesn't grade it.
+  let sleep = try #require(cases.first { $0.question.lowercased().contains("5am") || $0.question.lowercased().contains("waking") })
+  if sleep.child.ageMonths != nil, AskSafety.gate(question: sleep.question) == nil {
+    let beside = AgeContext.line(question: sleep.question, child: sleep.child, outcome: .floor(.noSupportingNote))
+    let shown = try #require(report.results.first { $0.id == sleep.id }?.shown)
+    if let beside {
+      #expect(!shown.contains(beside.text))
+    }
+  }
+}
+
 @Test func neverGivingATipIsTheBarToBeat() async throws {
   let cases = try EvalSet.bundled().cases
   let refs = await EvalRunner.neverTipsReports(cases)
