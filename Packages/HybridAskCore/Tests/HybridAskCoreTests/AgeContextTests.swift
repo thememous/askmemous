@@ -25,13 +25,16 @@ private func line(_ question: String, _ child: AskChild = mia, _ outcome: AskOut
   #expect(AgeContext.entries[.curiosity] == nil)
   #expect(AgeContext.entries[.school] == nil)
   #expect(AgeContext.entryTexts.count == 63)
+  #expect(AgeContext.entries[.food]?[.m4to6] == "Milk is still the main food at this age. Many families start first foods around 6 months.")
   for topic in AgeContext.coveredTopics {
     for band in AgeContext.Band.allCases {
       let text = try #require(AgeContext.entries[topic]?[band])
       #expect((1...240).contains(text.count), "\(topic) \(band.rawValue) is \(text.count) characters")
       let sentences = text.split(whereSeparator: { ".!?".contains($0) }).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
       #expect((1...2).contains(sentences.count), "\(topic) \(band.rawValue)")
-      #expect(!text.contains { $0.isNumber }, "\(topic) \(band.rawValue) gives an amount")
+      // An age named as "6 months" is not a dose. Any other digit is.
+      let withoutAges = text.replacingOccurrences(of: #"\d+ months"#, with: "months", options: .regularExpression)
+      #expect(!withoutAges.contains { $0.isNumber }, "\(topic) \(band.rawValue) gives an amount")
     }
   }
 }

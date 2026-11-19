@@ -6,75 +6,75 @@
   ],
   "entries": {
     "sleep": {
-      "0-3": "Many babies this age sleep in short stretches through the day and night, and waking to feed is common. A dark, quiet place to put them down is a common setup.",
+      "0-3": "Many babies this age sleep in short stretches through the day and night, and often wake to feed. Lots of families put them down in a dark, quiet place.",
       "4-6": "Night sleep often gets longer around this age, and many babies still nap several times in the day. Families often use the same short wind-down each evening.",
-      "7-12": "Many babies this age take two or three naps and still wake at night. The same few steps at bedtime are a common way the day ends.",
-      "13-18": "Many toddlers this age still need one nap a day, and waking early is common. A familiar bedtime routine is a common way families wind down.",
-      "19-24": "Many toddlers this age still nap once in the day, and protesting bedtime is common. Keeping the same wind-down steps is a common approach.",
-      "25-36": "Some children this age still nap, and some are giving the nap up. Bedtime resistance is common, and a steady evening routine is a common response.",
+      "7-12": "Many babies this age take two or three naps and still wake at night. Lots of families end the day with the same few bedtime steps.",
+      "13-18": "Many toddlers this age still need one nap a day, and waking early still happens. Lots of families wind down with the same bedtime routine.",
+      "19-24": "Many toddlers this age still nap once in the day, and bedtime protests are part of many evenings. It often helps to keep the same wind-down steps.",
+      "25-36": "Some children this age still nap, and some are giving the nap up. Bedtime resistance shows up a lot, and many families answer it with a steady evening routine.",
       "37-60": "Many children this age have stopped napping. Stalling at bedtime and waking in the night still happen in a lot of families."
     },
     "food": {
       "0-3": "Milk feeds, often through the day and night, are how babies this age eat. Hunger often returns sooner than a clock suggests.",
-      "4-6": "Milk feeds are still the food at this age. Many babies start to watch what other people are eating.",
+      "4-6": "Milk is still the main food at this age. Many families start first foods around 6 months.",
       "7-12": "Many babies this age are learning to eat soft foods as well as milk, and a mess is part of that. Appetite often changes from one day to the next.",
-      "13-18": "Many toddlers this age eat small meals and turn down foods they liked recently. Eating with the family is a common way meals happen.",
-      "19-24": "Wanting the same few foods, and refusing others, is common at this age. Offering a familiar food alongside something else is a common approach.",
-      "25-36": "Many children this age still prefer a few familiar foods. Meals can be short, and playing with food is common.",
+      "13-18": "Many toddlers this age eat small meals and turn down foods they liked recently. Lots of families have meals together.",
+      "19-24": "Lots of toddlers this age want the same few foods and refuse others. Many families offer a familiar food alongside something else.",
+      "25-36": "Many children this age still prefer a few familiar foods. Meals can be short, and playing with food is part of it.",
       "37-60": "Many children this age eat with the family and still refuse some foods. Appetite often goes up and down across the week."
     },
     "play": {
-      "0-3": "Watching a face, listening to a voice and short awake spells are common play at this age.",
-      "4-6": "Reaching, mouthing objects and time spent on the floor are common play. A spell of play is often only a few minutes.",
-      "7-12": "Banging, dropping and passing objects back and forth are common play. Many babies want the same little game over and over.",
-      "13-18": "Filling and tipping containers, and playing beside other children, are common. Play is often on the move.",
-      "19-24": "Simple pretend play, such as feeding a doll or pushing a toy car, is common. Children this age often play near others more than with them.",
-      "25-36": "Pretend play and very simple games with turns are common. Play can tip into frustration quickly.",
-      "37-60": "Imaginative play and time with other children are common. Games with a few simple rules start to make sense to many children this age."
+      "0-3": "Watching a face, listening to a voice and short awake spells are how many babies this age play.",
+      "4-6": "Reaching, mouthing objects and time on the floor fill a lot of play. A spell of it often lasts only a few minutes.",
+      "7-12": "Banging, dropping and passing objects back and forth fill a lot of play. Many babies want the same little game over and over.",
+      "13-18": "Filling and tipping containers, and playing beside other children, take up a lot of playtime. Play is often on the move.",
+      "19-24": "Simple pretend play, such as feeding a doll or pushing a toy car, shows up for lots of toddlers. They often play near others more than with them.",
+      "25-36": "Pretend play and very simple games with turns are a big part of play. Play can tip into frustration quickly.",
+      "37-60": "Imaginative play and time with other children take up a lot of the day. Games with a few simple rules start to make sense to many children this age."
     },
     "feelings": {
       "0-3": "Crying is a main way babies this age say they need something. Settling often comes with holding, feeding or a change of position.",
-      "4-6": "Many babies this age are more social, and may fuss when a familiar person leaves. A calm adult close by is a common comfort.",
-      "7-12": "Caution around new people, and clinging to familiar ones, is common. Big cries over a small change happen a lot.",
-      "13-18": "Big feelings are common, including a short meltdown when a toddler cannot manage something alone. Staying close and calm is a common way adults respond.",
-      "19-24": "Tantrums, and wanting to do things without help, are common. A calm adult nearby is a common way the moment passes.",
-      "25-36": "Strong feelings about small changes are common. Naming the feeling out loud is a common way adults respond.",
-      "37-60": "Many children this age can say how they feel, and a big reaction to disappointment is still common. Time with a calm adult often helps the feeling pass."
+      "4-6": "Many babies this age are more social, and may fuss when a familiar person leaves. A calm adult close by is often what settles them.",
+      "7-12": "Caution around new people, and clinging to familiar ones, shows up a lot. Big cries over a small change happen too.",
+      "13-18": "Big feelings come on fast, including a short meltdown when a toddler cannot manage something alone. Many adults stay close and calm.",
+      "19-24": "Tantrums, and wanting to do things without help, are part of many days. A calm adult nearby often sees the moment pass.",
+      "25-36": "Strong feelings about small changes come easily. Many adults name the feeling out loud.",
+      "37-60": "Many children this age can say how they feel, and a big reaction to disappointment still happens. Time with a calm adult often helps the feeling pass."
     },
     "talking": {
-      "0-3": "Cooing, crying and going quiet for a familiar voice are common. Babies this age also start to trade sounds back and forth.",
-      "4-6": "Babbling and turning toward a voice are common. Many babies enjoy hearing the same sounds again and again.",
-      "7-12": "Babbling with a wider mix of sounds is common, and a first word may appear. Understanding usually runs ahead of the words a baby can say.",
+      "0-3": "Cooing, crying and going quiet for a familiar voice are what many babies do. They also start to trade sounds back and forth.",
+      "4-6": "Babbling and turning toward a voice fill a lot of the day. Many babies enjoy hearing the same sounds again and again.",
+      "7-12": "Babbling with a wider mix of sounds is what many babies do, and a first word may appear. Understanding usually runs ahead of the words a baby can say.",
       "13-18": "Many toddlers this age say a handful of words and understand far more than they say. Pointing and gestures carry a lot of what they mean.",
-      "19-24": "Many toddlers this age add words quickly, and phrases of two words are common. Understanding still runs ahead of speaking.",
-      "25-36": "Short sentences and lots of questions are common. People outside the family often find the speech hard to follow, which is common at this age.",
+      "19-24": "Many toddlers this age add words quickly, and phrases of two words start to appear. Understanding still runs ahead of speaking.",
+      "25-36": "Short sentences and lots of questions fill a lot of talk. People outside the family often find the speech hard to follow at this age.",
       "37-60": "Many children this age speak in sentences and can tell a simple story about the day. Conversation goes back and forth more easily."
     },
     "moving": {
-      "0-3": "Lifting the head during floor time and watching things that move are common. Movement comes in short bursts.",
-      "4-6": "Rolling, reaching and pushing up on the arms during floor time are common. Each baby gets there in their own time.",
-      "7-12": "Sitting, crawling and pulling up to stand are common, and the timing varies a lot from one baby to another.",
-      "13-18": "Walking and climbing are common, and so are tumbles. Moving along the furniture often comes first.",
-      "19-24": "Running, climbing and kicking a ball are common. Stairs are interesting, and a hand to hold is a common way families use them.",
-      "25-36": "Jumping, running and trying stairs with a hand to hold are common. Balance is still developing.",
-      "37-60": "Hopping, climbing and riding a trike or scooter are common for many children this age. Coordination is still coming along."
+      "0-3": "Lifting the head during floor time and watching things that move take up a lot of awake time. Movement comes in short bursts.",
+      "4-6": "Rolling, reaching and pushing up on the arms during floor time show up for many babies. Each one gets there in their own time.",
+      "7-12": "Sitting, crawling and pulling up to stand show up in this stretch, and the timing varies a lot from one baby to another.",
+      "13-18": "Walking, climbing and tumbles all show up. Moving along the furniture often comes first.",
+      "19-24": "Running, climbing and kicking a ball take up a lot of play. Stairs are interesting, and many families offer a hand to hold.",
+      "25-36": "Jumping, running and trying stairs with a hand to hold fill a lot of active time. Balance is still developing.",
+      "37-60": "Hopping, climbing and riding a trike or scooter show up for many children this age. Coordination is still coming along."
     },
     "care": {
       "0-3": "Frequent nappy changes are part of the day. Baths are short, with an adult there the whole time.",
       "4-6": "Bath time is often a playful part of the day, with an adult there throughout. Nappy changes are still very frequent.",
       "7-12": "Many babies this age take an interest in getting dressed. An adult still stays within reach for the whole bath.",
-      "13-18": "Wanting to help with dressing and washing hands is common, and it often takes longer that way.",
+      "13-18": "Lots of toddlers want to help with dressing and washing hands, and it often takes longer that way.",
       "19-24": "Many toddlers this age want to wash and dress themselves. Nappy or potty timing varies a lot from one child to another.",
-      "25-36": "Interest in the potty is common, and so is a wide range of timing. Accidents are part of this stretch for many families.",
-      "37-60": "Many children this age use the toilet, and accidents still happen. Brushing teeth with an adult helping is common."
+      "25-36": "Interest in the potty shows up, and so does a wide range of timing. Accidents are part of this stretch for many families.",
+      "37-60": "Many children this age use the toilet, and accidents still happen. Brushing teeth with an adult helping is what many families do."
     },
     "outings": {
-      "0-3": "Short trips out, and a lot of time being carried, are common. Many babies sleep on the way.",
+      "0-3": "Short trips out, and a lot of time being carried, fill the early months. Many babies sleep on the way.",
       "4-6": "Many babies this age like looking around on a trip, and some fuss on the way. Shorter outings tend to go more smoothly.",
       "7-12": "Outings often go better when they stay short. Many babies this age want to see what is happening around them.",
-      "13-18": "Many toddlers this age want to walk some of the way and be carried the rest. A short trip with something to look at is a common outing.",
-      "19-24": "Wanting to walk, and tiring of a long trip, are common. A familiar toy and something to eat are a common way families keep going.",
-      "25-36": "Many children this age manage a short outing and find a long wait hard. Saying what comes next is a common way families help.",
+      "13-18": "Many toddlers this age want to walk some of the way and be carried the rest. A short trip with something to look at is what many families try.",
+      "19-24": "Wanting to walk, and tiring of a long trip, are part of many outings. A familiar toy and something to eat are how many families keep going.",
+      "25-36": "Many children this age manage a short outing and find a long wait hard. It often helps to say what comes next.",
       "37-60": "Many children this age manage a longer outing when they know the plan. Waiting is still hard for a lot of them."
     },
     "screens": {
@@ -82,9 +82,9 @@
       "4-6": "Babies this age learn from people and from objects they can touch. Screens are not a usual way to fill play at this age.",
       "7-12": "People, voices and objects a baby can handle are still how this age learns. Screen use is uncommon as play.",
       "13-18": "Children this age still learn most from people and from play. Screens are still an uncommon way to spend the day.",
-      "19-24": "Where families use a screen at this age, watching together and talking about it is the common pattern, and it stays brief.",
+      "19-24": "Where families use a screen at this age, watching together and talking about it is what many of them do, and it stays brief.",
       "25-36": "Many families keep screen time short and shared at this age. Play and conversation still fill most of the day.",
-      "37-60": "Many children this age watch a screen sometimes. Keeping it brief, with an adult watching too, is a common family pattern."
+      "37-60": "Many children this age watch a screen sometimes. Keeping it brief, with an adult watching too, is what many families do."
     }
   }
 }
