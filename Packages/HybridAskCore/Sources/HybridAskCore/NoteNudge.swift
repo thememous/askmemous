@@ -53,7 +53,7 @@ public enum NoteNudge {
     case .curiosity:
       "Write what caught {name}'s interest in one line, and next time I can point to what works for {name}."
     case .feelings:
-      "Write how the moment went in one line, and next time I can point to what works for {name}."
+      "Write what helped {name} calm down today in one line, and next time I can point to what works for {name}."
     case .talking:
       "Write a word from today in one line, and next time I can point to what works for {name}."
     case .moving:

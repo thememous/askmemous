@@ -15,6 +15,8 @@ private let noMore = AskOutcome.floor(.noOtherNote)
     == "Write what Mia ate today in one line, and next time I can point to what works for Mia.")
   #expect(NoteNudge.hint(question: "Why is she so curious about everything?", childName: "Mia", outcome: noNote)
     == "Write what caught Mia's interest in one line, and next time I can point to what works for Mia.")
+  #expect(NoteNudge.hint(question: "She had a tantrum this afternoon", childName: "Mia", outcome: noNote)
+    == "Write what helped Mia calm down today in one line, and next time I can point to what works for Mia.")
   #expect(NoteNudge.hint(question: "How was school today?", childName: "Mia", outcome: noNote)
     == "Write how the day went in one line, and next time I can point to what works for Mia.")
 }
