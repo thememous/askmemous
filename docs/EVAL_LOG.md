@@ -427,3 +427,19 @@ sentence, and that the results table has the same columns. No new phone run.
 The numbers above stay comparable. An on-device question label (a second model
 call before the gates) was not added.
 
+## 2026-11-19 · Note nudge, and the paediatrician line under the age line
+
+When no note backs a tip (`noSupportingNote`, and `noOtherNote` after every
+usable note is used) and the question was not gated, the card shows one
+person-written hint for the topic, under the age line. Tapping it opens Add
+note. An unknown topic gets a generic hint. No model writes the hint.
+
+"If you're worried, ask your paediatrician." now sits at the bottom of a tip
+card, under the age line when one is shown. It is still not part of the tip
+text. Floor copy is unchanged.
+
+Eval: a unit test runs the runner for both variants and checks that no shown
+text, grade or markdown row contains the worry line or a note nudge, and that
+a floor step is still only its reason tag. The results table has the same
+columns. No new phone run. The numbers above stay comparable.
+

@@ -111,13 +111,17 @@ private struct QuestionRow: View {
 private struct QuestionDetail: View {
   let record: AskRecord
 
-  /// Recomputed from the saved question. The line is not stored on the answer, so the eval's tip text stays as it was.
+  /// Recomputed from the saved question. Neither is stored on the answer, so the eval's tip text stays as it was.
   private var ageLine: AgeContext.Line? {
     AgeContext.line(
       question: record.question,
       child: AskChild(name: record.childName, ageMonths: record.childAgeMonths),
       outcome: record.answer.outcome
     )
+  }
+
+  private var noteNudge: String? {
+    NoteNudge.hint(question: record.question, childName: record.childName, outcome: record.answer.outcome)
   }
 
   var body: some View {
@@ -131,7 +135,7 @@ private struct QuestionDetail: View {
           Text("\(record.childName) was \(QuestionsView.groupTitle(record).dropFirst(3)) old.")
         }
       }
-      AnswerSection(answer: record.answer, childName: record.childName, ageLine: ageLine)
+      AnswerSection(answer: record.answer, childName: record.childName, ageLine: ageLine, noteNudge: noteNudge)
     }
     .navigationTitle("Question")
     .navigationBarTitleDisplayMode(.inline)

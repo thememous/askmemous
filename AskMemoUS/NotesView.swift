@@ -225,7 +225,7 @@ private struct NoteReadingSheet: View {
   }
 }
 
-private struct AddNoteSheet: View {
+struct AddNoteSheet: View {
   @Environment(\.modelContext) private var context
   @Environment(\.dismiss) private var dismiss
   @State private var text = ""

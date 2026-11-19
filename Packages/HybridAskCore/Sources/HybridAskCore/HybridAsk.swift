@@ -176,6 +176,7 @@ public enum FloorText {
     }
   }
 
-  /// Shown under every tip, by the app.
+  /// Shown by the app at the bottom of a tip card, under the age line when there is one.
+  /// Not part of the tip text the eval grades.
   public static let worryLine = "If you're worried, ask your paediatrician."
 }

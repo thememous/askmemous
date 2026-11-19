@@ -7,10 +7,11 @@ struct AnswerSection: View {
   let answer: AskAnswer
   let childName: String
   var ageLine: AgeContext.Line? = nil
+  var noteNudge: String? = nil
 
   var body: some View {
     Section {
-      AnswerBody(answer: answer, childName: childName, ageLine: ageLine)
+      AnswerBody(answer: answer, childName: childName, ageLine: ageLine, noteNudge: noteNudge)
     } header: {
       SourceLabel(answer: answer)
     }
@@ -22,6 +23,8 @@ struct AnswerBody: View {
   let answer: AskAnswer
   let childName: String
   var ageLine: AgeContext.Line? = nil
+  var noteNudge: String? = nil
+  @State private var isAddingNote = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -41,17 +44,34 @@ struct AnswerBody: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.soft, in: .rect(cornerRadius: 12))
-        Text(FloorText.worryLine).font(.caption).foregroundStyle(Theme.muted)
       case let .floor(reason):
         Text(FloorText.text(reason, childName: childName)).foregroundStyle(Theme.ink)
       }
       if let ageLine {
         AgeContextBlock(line: ageLine, childName: childName)
       }
+      if let noteNudge {
+        Button { isAddingNote = true } label: {
+          HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "square.and.pencil")
+            Text(noteNudge)
+              .multilineTextAlignment(.leading)
+              .frame(maxWidth: .infinity, alignment: .leading)
+          }
+          .font(.footnote)
+          .foregroundStyle(Theme.accent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens a new note")
+      }
+      if case .tip = answer.outcome {
+        Text(FloorText.worryLine).font(.caption).foregroundStyle(Theme.muted)
+      }
       #if DEBUG
       DebugLines(answer: answer)
       #endif
     }
+    .sheet(isPresented: $isAddingNote) { AddNoteSheet() }
   }
 }
 

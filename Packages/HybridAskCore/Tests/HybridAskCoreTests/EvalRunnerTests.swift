@@ -103,6 +103,31 @@ private struct EagerWriter: FreeTextAskModel {
   }
 }
 
+@Test func evalRunnerOutputLeavesTheWorryLineAndNoteNudgeUngraded() async throws {
+  let cases = try EvalSet.bundled().cases
+  let runner = EvalRunner(pointer: FirstNotePointer(), writer: EagerWriter(tip: "Try that again."))
+  for variant in [AskVariant.modelPoints, .modelWrites] {
+    let report = await runner.run(cases, variant: variant, route: .onDeviceOnly, cloudAllowed: false)
+    #expect(report.complete, "\(variant)")
+    #expect(!report.markdownRow.contains(FloorText.worryLine), "\(variant)")
+    #expect(!report.markdownRow.contains("next time I can point"), "\(variant)")
+    for result in report.results {
+      #expect(!result.shown.contains(FloorText.worryLine), "\(result.id) showed the worry line")
+      #expect(!result.grade.contains(FloorText.worryLine), "\(result.id) graded the worry line")
+      #expect(!result.shown.contains("next time I can point"), "\(result.id) showed a note nudge")
+      #expect(!result.grade.contains("next time I can point"), "\(result.id) graded a note nudge")
+      for step in result.shown.components(separatedBy: " → ") where step.hasPrefix("[") {
+        let raw = String(step.dropFirst().dropLast())
+        #expect(FloorReason(rawValue: raw) != nil, "\(result.id): \(step)")
+      }
+    }
+  }
+  #expect(EvalReport.markdownHeader == """
+  | Variant | Route | Passed | Held-out | Right tips | Wrong tips shown | Unsafe tips shown | Follow-ups | On device / cloud / app | Avg model s |
+  |---|---|---|---|---|---|---|---|---|---|
+  """)
+}
+
 @Test func neverGivingATipIsTheBarToBeat() async throws {
   let cases = try EvalSet.bundled().cases
   let refs = await EvalRunner.neverTipsReports(cases)

@@ -13,7 +13,7 @@ struct AskView: View {
 
   /// One exchange: what the parent said, and the reply.
   struct Turn: Identifiable {
-    enum Reply { case waiting, answer(AskAnswer, ageLine: AgeContext.Line?), why(String) }
+    enum Reply { case waiting, answer(AskAnswer, ageLine: AgeContext.Line?, noteNudge: String?), why(String) }
     let id = UUID()
     let said: String
     var reply: Reply
@@ -131,9 +131,9 @@ struct AskView: View {
       switch turn.reply {
       case .waiting:
         HStack(spacing: 8) { ProgressView(); Text("Reading your notes…").foregroundStyle(Theme.muted) }
-      case let .answer(answer, ageLine):
+      case let .answer(answer, ageLine, noteNudge):
         SourceLabel(answer: answer).font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
-        AnswerBody(answer: answer, childName: child.name, ageLine: ageLine)
+        AnswerBody(answer: answer, childName: child.name, ageLine: ageLine, noteNudge: noteNudge)
       case let .why(text):
         Label("Answered by the app", systemImage: "text.book.closed")
           .font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
@@ -237,7 +237,7 @@ struct AskView: View {
   /// The latest model-path answer ("Why this note?" replies don't count).
   private var lastAnswer: AskAnswer? {
     for turn in turns.reversed() {
-      if case let .answer(a, _) = turn.reply { return a }
+      if case let .answer(a, _, _) = turn.reply { return a }
     }
     return nil
   }
@@ -273,7 +273,7 @@ struct AskView: View {
 
   /// After the parent allows cloud checks: ask the latest request again and replace that reply.
   private func recheckInCloud() async {
-    guard let last = turns.lastIndex(where: { if case .answer(_, _) = $0.reply { true } else { false } }) else { return }
+    guard let last = turns.lastIndex(where: { if case .answer = $0.reply { true } else { false } }) else { return }
     let said = turns[last].said
     turns.removeSubrange(last...)
     await run(said: said, replacingSaved: true)
@@ -292,7 +292,8 @@ struct AskView: View {
                                       route: activeRoute, cloudAllowed: cloudAllowed, excluding: used,
                                       safety: remote.safety, now: askedAt)
     let ageLine = AgeContext.line(question: topic, child: askChild, outcome: result.outcome, safety: remote.safety)
-    turns[index].reply = .answer(result, ageLine: ageLine)
+    let noteNudge = NoteNudge.hint(question: topic, childName: child.name, outcome: result.outcome, safety: remote.safety)
+    turns[index].reply = .answer(result, ageLine: ageLine, noteNudge: noteNudge)
     if case let .tip(_, note) = result.outcome { used.insert(note.id) }
     guard result.outcome != .floor(.emptyQuestion) else { return }
     let record = AskRecord(askedAt: askedAt, question: topic, child: askChild, answer: result)

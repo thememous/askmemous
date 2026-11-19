@@ -83,7 +83,13 @@ after seeing the cases. Every change and run is dated in
    app may add a short line for the child's age ("At 14 months"). A person wrote
    every sentence. No model writes it. It stays off when there is no birthday,
    the question names no topic the library covers, or the reply is the fixed
-   emergency, distress or health one.
+   emergency, distress or health one. On a tip, "If you're worried, ask your
+   paediatrician." sits under that line.
+9. **A nudge to write a note.** When no note backs a tip, and the question was
+   not gated, the app adds one person-written hint for the topic ("Write
+   tonight's bedtime in one line, and next time I can point to what works for
+   Mia."). An unknown topic gets a generic hint. Tapping it opens Add note. No
+   model writes it, and it is not part of the graded answer.
 
 **Follow-ups.** Ask is a short conversation. Under each tip, "Another idea"
 and "Didn't help" ask the same question again with the notes already used left
@@ -144,13 +150,14 @@ notes, the questions or the child is sent.
 ## What it doesn't do
 
 - **It isn't medical advice.** Health questions get a fixed reply, and every
-  tip ends with "If you're worried, ask your paediatrician."
+  tip card ends with "If you're worried, ask your paediatrician.", under the
+  age line when one is shown.
 - **Age context is general.** It is not about this child, and it is not medical
   advice. It says what is common at that age. It does not say a child is behind,
   and it does not give amounts or doses.
 - **The tip only repeats what the parent noted.** It won't invent a new idea. If no
-  note backs a tip, it says so and suggests what to note next time. The age line,
-  when it shows, is that general context, not a new tip.
+  note backs a tip, it says so, may show the age line, and offers a hint that
+  opens Add note. That hint is not a new tip.
 - **The gates are word lists.** They fail closed ("she swallowed her food" gets
   the emergency reply), but a worry phrased in words they don't know gets
   through to the normal checks. English only. Remote Config can add phrases.
