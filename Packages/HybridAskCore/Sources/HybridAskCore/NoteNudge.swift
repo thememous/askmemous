@@ -34,9 +34,10 @@ public enum NoteNudge {
     }
   }
 
-  /// Same word lists and "but" rule as the age line. Curiosity and school get a
-  /// hint too. No recognised topic means the generic sentence.
+  /// Same choice as the age line, including the display-only words. Curiosity and
+  /// school still get their own hint when that list has nothing for them.
   static func topic(in question: String) -> AskTopic? {
+    if let shown = AgeContext.preferredTopic(in: question) { return shown }
     let asked = AskCheck.askedTopics(question)
     guard !asked.isEmpty else { return nil }
     return AgeContext.earliest(in: AgeContext.decidingText(question), among: asked)

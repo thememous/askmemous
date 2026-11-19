@@ -130,3 +130,73 @@ private func line(_ question: String, _ child: AskChild = mia, _ outcome: AskOut
   #expect(line("She had a night terror at bedtime", mia, floor, safety: extra) == nil)
   #expect(line("She had a night terror at bedtime") != nil)
 }
+
+/// Everyday questions at 14 months. Nil only where no age entry and no display word fits.
+/// The three built-in suggestions are first, and each one has a line.
+@Test func everydayQuestionsGetADisplayTopicAt14Months() {
+  let probe: [(String, AskTopic?)] = [
+    ("She keeps waking at 5am. What could I try this week?", .sleep),
+    ("Evenings are hard lately. Any ideas?", .sleep),
+    ("How can I get her to eat lunch?", .food),
+    ("Mornings take forever", .care),
+    ("Getting out the door takes ages", .outings),
+    ("She whines about everything", .feelings),
+    ("How can I keep her busy?", .play),
+    ("She's bored", .play),
+    ("Separation anxiety at goodbye", .feelings),
+    ("She's shy with new people", .feelings),
+    ("Transitions are really hard", .feelings),
+    ("She doesn't listen", .feelings),
+    ("The witching hour is awful", .sleep),
+    ("She gets overexcited", .feelings),
+    ("Sibling jealousy is getting worse", .feelings),
+    ("We have a new baby at home", .feelings),
+    ("Rainy days drag on", .play),
+    ("She won't hold my hand", .outings),
+    ("Daycare drop-off is hard", .feelings),
+    ("Wind down is a struggle", .sleep),
+    ("Errands take too long", .outings),
+    ("She hates leaving the house", .outings),
+    ("She's jealous of her brother", .feelings),
+    ("Her sister got more attention", .feelings),
+    ("He is shy around strangers", .feelings),
+    ("Indoor play on a rainy day", .play),
+    ("How is bedtime going?", .sleep),
+    ("She skipped breakfast", .food),
+    ("She won't share the blocks", .play),
+    ("She had a tantrum this afternoon", .feelings),
+    ("Is she saying any words yet?", .talking),
+    ("She just started walking", .moving),
+    ("Bath time is a fight", .care),
+    ("Car rides are miserable", .outings),
+    ("She wants the tablet all the time", .screens),
+    ("What colour is the sky today?", nil),
+    ("How was school today?", nil),
+    ("Why is she so curious about everything?", nil),
+    ("Can grandparents visit this weekend?", nil),
+    ("What should we do about the laundry pile?", nil),
+    ("She answers no to every request", .feelings),
+    ("Nursery pickup was rough", .feelings),
+    ("Mornings and evenings are both hard", .care),
+    ("She won't nap after busy mornings", .sleep),
+    ("Keep her busy while I cook", .play),
+    ("She's whining in the car", .outings),
+    ("Getting out the door for an errand", .outings),
+    ("She cried at drop-off", .feelings),
+    ("Indoors all afternoon", .play),
+    ("Play at the park was short", .play),
+  ]
+  #expect(probe.count == 50)
+  let suggestions = [
+    "She keeps waking at 5am. What could I try this week?",
+    "Evenings are hard lately. Any ideas?",
+    "How can I get her to eat lunch?",
+  ]
+  for suggestion in suggestions {
+    #expect(line(suggestion) != nil, "\(suggestion)")
+  }
+  for (question, expected) in probe {
+    let got = line(question)?.topic
+    #expect(got == expected, "\(question) -> \(String(describing: got))")
+  }
+}

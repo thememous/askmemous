@@ -105,12 +105,76 @@ public enum AgeContext {
 
   /// The library topic the question is about. Word matching is `AskCheck.askedTopics`
   /// (including the "but" rule). When that set has more than one covered topic, the
-  /// one whose stem appears first in the same stretch of text wins. Anything else is nil.
+  /// one whose stem appears first in the same stretch of text wins.
+  ///
+  /// When that finds no topic with an age entry, a display-only list fills in
+  /// everyday wording ("evenings", "whines") that must not change which notes
+  /// count as relevant. `AskTopic.stems` is not used here.
   static func topic(in question: String, band: Band) -> AskTopic? {
+    guard let topic = preferredTopic(in: question), entries[topic]?[band] != nil else { return nil }
+    return topic
+  }
+
+  /// Topic for the age line and the note hint. A stem topic that has an age entry
+  /// wins. Otherwise the display-only list. Curiosity and school are left for the
+  /// caller: they have no age entry, and the display list does not rename them.
+  static func preferredTopic(in question: String) -> AskTopic? {
     let asked = AskCheck.askedTopics(question)
-    let covered = asked.filter { entries[$0]?[band] != nil }
-    guard !covered.isEmpty else { return nil }
-    return earliest(in: decidingText(question), among: covered)
+    let covered = asked.filter { coveredTopics.contains($0) }
+    let text = decidingText(question)
+    if !covered.isEmpty { return earliest(in: text, among: covered) }
+    return displayTopic(in: text)
+  }
+
+  /// Person-readable words for the card only. A single word matches the start of a
+  /// word ("evening" matches "evenings"). A phrase matches consecutive words.
+  /// "leav" is the shared start of "leave" and "leaving". A piece shorter than
+  /// 4 letters has to be the whole word, so "no" does not catch "nothing" and
+  /// "to" does not catch "today".
+  static let displayStems: [(AskTopic, String)] = [
+    (.sleep, "evening"), (.sleep, "witching"),
+    (.care, "morning"),
+    (.outings, "door"), (.outings, "hand"), (.outings, "errand"),
+    (.feelings, "whin"), (.feelings, "separation"), (.feelings, "daycare"), (.feelings, "nursery"),
+    (.feelings, "shy"), (.feelings, "stranger"), (.feelings, "jealous"), (.feelings, "sibling"),
+    (.feelings, "brother"), (.feelings, "sister"), (.feelings, "transition"), (.feelings, "listen"),
+    (.feelings, "overexcit"),
+    (.play, "busy"), (.play, "bored"), (.play, "rainy"), (.play, "indoors"),
+  ]
+
+  static let displayPhrases: [(AskTopic, [String])] = [
+    (.sleep, ["wind", "down"]),
+    (.outings, ["leav", "the", "house"]),
+    (.feelings, ["drop", "off"]),
+    (.feelings, ["new", "baby"]),
+    (.feelings, ["no", "to"]),
+  ]
+
+  static func displayTopic(in text: String) -> AskTopic? {
+    let words = text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    for index in words.indices {
+      if let phrase = displayPhrases.first(where: { matches($0.1, at: index, in: words) }) {
+        return phrase.0
+      }
+      let word = words[index]
+      if let stem = displayStems.first(where: { word.hasPrefix($0.1) }) {
+        return stem.0
+      }
+    }
+    return nil
+  }
+
+  static func matches(_ parts: [String], at index: Int, in words: [String]) -> Bool {
+    guard index + parts.count <= words.count else { return false }
+    for (offset, part) in parts.enumerated() {
+      let word = words[index + offset]
+      if part.count >= 4 {
+        if !word.hasPrefix(part) { return false }
+      } else if word != part {
+        return false
+      }
+    }
+    return true
   }
 
   /// The words `askedTopics` actually judges. Kept in step with that function:

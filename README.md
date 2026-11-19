@@ -123,9 +123,12 @@ They do not depend on gender. The app has no gender field.
 
 The app picks the line with the same word lists it uses for topics: sleep, food,
 play, feelings, talking, moving, care, outings and screens. Curiosity and school
-have no lines. The child's age in months picks the band: 0–3, 4–6, 7–12, 13–18,
-19–24, 25–36 or 37–60. No birthday, no matching topic, no entry for that band,
-or an age past 60 months: no line. The app does not guess.
+have no lines. When those lists find no topic that has a line, a separate
+display-only list fills in everyday wording such as "evenings", "mornings" and
+"whines". That list is not used to decide which notes are relevant. The child's
+age in months picks the band: 0–3, 4–6, 7–12, 13–18, 19–24, 25–36 or 37–60. No
+birthday, no matching topic, no entry for that band, or an age past 60 months:
+no line. The app does not guess.
 
 On the card, the tip's source line still says where the tip came from (on this
 iPhone, the cloud, or the app). The age line has its own label, "General

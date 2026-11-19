@@ -443,3 +443,15 @@ text, grade or markdown row contains the worry line or a note nudge, and that
 a floor step is still only its reason tag. The results table has the same
 columns. No new phone run. The numbers above stay comparable.
 
+## 2026-11-19 · Display-only words for the age line and the note hint
+
+Everyday questions such as "Evenings are hard lately" matched no topic, so
+they got neither an age line nor a note hint. A display-only word list in
+`AgeContext` now fills those in, and only when the topic stems find no topic
+that has an age entry. `AskTopic.stems` is unchanged, so which notes are
+relevant is unchanged.
+
+Eval: the existing runner test still checks that shown text, grades and the
+markdown row do not contain an age line, the worry line or a note nudge. No
+new phone run. The numbers above stay comparable.
+
