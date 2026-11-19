@@ -15,7 +15,7 @@ struct SettingsView: View {
 
   private var versionLine: String {
     let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
-    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "5"
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "6"
     return "AskMemoUS \(short) (\(build))"
   }
 
